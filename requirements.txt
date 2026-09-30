@@ -1,0 +1,2 @@
+packaging==26.2
+pymupdf==1.28.2

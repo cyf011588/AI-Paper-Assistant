@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# 环境变量
+.env
+config_local.py
+src/config.py
+
+# 数据（不上传大文件）
+data/papers/
+data/processed/
+data/chroma_db/
+data/chroma/
+*.pdf
+
+# 模型文件
+*.bin
+*.pt
+*.pth
+
+# 日志
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

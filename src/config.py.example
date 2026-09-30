@@ -1,0 +1,42 @@
+"""
+config.py — 全局配置（模板）
+使用前复制为 config.py 并填入你自己的 API key
+"""
+
+from pathlib import Path
+
+# =========================
+# 路径配置
+# =========================
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+PAPERS_DIR = DATA_DIR / "papers"
+PROCESSED_DIR = DATA_DIR / "processed"
+DB_DIR = DATA_DIR / "chroma_db"
+METADATA_PATH = DATA_DIR / "paper_metadata.json"
+
+# =========================
+# DeepSeek API 配置
+# =========================
+DEEPSEEK_API_KEY = "your-api-key-here"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-chat"
+
+# =========================
+# 解析参数
+# =========================
+HEADER_HEIGHT_RATIO = 0.08
+FOOTER_HEIGHT_RATIO = 0.92
+SMALL_FONT_SIZE = 7
+MAX_HEADING_LEN = 100
+
+# =========================
+# Chunking 参数
+# =========================
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 80
+
+# =========================
+# 检索参数
+# =========================
+TOP_K = 5
