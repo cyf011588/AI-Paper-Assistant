@@ -33,8 +33,11 @@ class QueryUnderstanding:
 
         # 构建别名→论文名列表的映射（一个别名可能对应多篇论文）
         self.alias_map = {}
+        self.paper_type_map = {}  # paper_name -> "thesis" 或 "journal"
         for paper in self.metadata:
             paper_name = paper["paper_name"]
+            # 判断论文类型
+            self.paper_type_map[paper_name] = paper.get("thesis_type", "journal")
             # 论文名本身也是别名
             key = paper_name.lower()
             if key not in self.alias_map:
@@ -67,12 +70,22 @@ class QueryUnderstanding:
         target_papers = []
         matched_aliases = []
 
+        # 判断用户指的是哪类论文
+        wants_thesis = any(kw in question for kw in ["毕业论文", "大论文", "学位论文", "毕业"])
+        wants_journal = any(kw in question for kw in ["小论文", "期刊论文", "期刊"])
+
         # 逐个匹配别名
         for alias, paper_names in self.alias_map.items():
             if len(alias) < 2:
                 continue
             if alias in question_lower:
                 for pn in paper_names:
+                    # 过滤：根据metadata里的thesis_type判断
+                    p_type = self.paper_type_map.get(pn, "journal")
+                    if wants_thesis and p_type != "thesis":
+                        continue
+                    if wants_journal and p_type != "journal":
+                        continue
                     if pn not in target_papers:
                         target_papers.append(pn)
                 matched_aliases.append(alias)

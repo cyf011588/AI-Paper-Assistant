@@ -334,10 +334,12 @@ class StructuredPDFParser:
         优先级：跨页校准位置 > 相对字号判断 > 文字模式匹配
         """
         # 1. 先查校准出的页眉/页脚位置
+        # 但如果字号明显比正文大，或者是黑体标题，说明是标题，不是页眉页脚
         x_ratio = round(x0 / page_width * 20) / 20
         y_ratio = round(y0 / page_height * 20) / 20
         pos_key = (x_ratio, y_ratio)
-        if pos_key in self.running_positions:
+        is_heiti = "SimHei" in font_name or "HZ" in font_name
+        if pos_key in self.running_positions and font_size < self.body_font_size * 1.3 and not is_heiti:
             return self.running_positions[pos_key]
 
         # 2. 字号判断：明显比正文小 + 在页面边缘 → 页眉页脚
@@ -353,9 +355,43 @@ class StructuredPDFParser:
         if re.match(r'^(Table|Tab\.)\s*\d+', text) and len(text) < 300:
             return "TABLE_CAPTION"
 
-        # 5. 章节编号格式标题（英文：1 Introduction；中文：1 引言）
-        if re.match(r'^\d+(\.\d+)*\.?\s+[A-Z一-龥]', text) and len(text) < 150:
+        # 4.5 目录页（有连续点号引导到页码）— 必须在HEADING判断之前
+        if re.search(r'\.{3,}|\．{3,}', text):
+            return "SKIP"
+
+        # 4.8 公式行（含大量数学符号/括号/上下标，不是标题）— 必须在HEADING判断之前
+        # 如："3 项：0.745(Ib/Ic)0.524fyctcwhc。"
+        has_math = bool(re.search(r'[=≈≤≥±∑∏∫αβγδθελμπσφψωΔΣΦ]', text))
+        has_mixed_formula = bool(re.search(r'\d+\.?\d*\s*[\(（][a-zA-Z/]+[\)）]', text))  # 数字(字母/字母)
+        has_formula_vars = bool(re.search(r'[a-zA-Z]{2,}\s*[=＝]', text))  # 变量=
+        if (has_math or has_mixed_formula or has_formula_vars) and not re.match(r'^第[一二三四五六七八九十\d]+章', text):
+            return "BODY"
+
+        # 5. 章节编号格式标题
+        # 支持：1 Introduction、2　承插式...、2.1　模型设计、4.6.1 滞回曲线
+        # 一级：X 标题；二级：X.X 标题；三级：X.X.X 标题
+        if re.match(r'^\d+(\.\d+){0,2}\s*[.．\s　]+\s*[A-Z一-龥]', text) and len(text) < 150:
+            # 排除图注/表注：以"图"/"表"开头
+            if not re.match(r'^(图|表|Fig\.?|Table?)\s*\d', text):
+                # 排除数字后跟着动词的（如"14 为TS10..."不是标题）
+                # 标题一般是名词短语，不会有"为/是/的/了"等动词
+                after_num = re.sub(r'^\d+(\.\d+){0,2}\s*[.．\s　]+\s*', '', text).strip()
+                if not re.match(r'^(为|是|的|了|在|有|和|与|及|或)', after_num):
+                    return "HEADING"
+
+        # 5.2 中文学位论文"第X章"格式
+        # 如：第一章 引言、第二章 试验研究
+        if re.match(r'^第[一二三四五六七八九十\d]+章\s+[一-龥]', text) and len(text) < 80:
             return "HEADING"
+
+        # 5.5 中文黑体标题
+        # SimHei（黑体）或 E-HZ（方正黑体）且字号比正文大
+        if ("SimHei" in font_name or "HZ" in font_name) and font_size >= self.body_font_size * 1.15 and len(text) < 80:
+            return "HEADING"
+
+        # 5.6 目录、致谢、作者简介等不需要入库的部分（必须在HEADING判断之前）
+        if re.match(r'^(目\s*录|图表目录|致\s*谢|作者简介|附\s*录|攻读.*期间)', text.strip()) and len(text) < 20:
+            return "SKIP"
 
         # 6. 无编号标题词（英文 + 中文）
         first_word = text.strip().split()[0] if text.strip() else ""
@@ -376,10 +412,17 @@ class StructuredPDFParser:
         if is_larger and is_bold and len(text) < 150:
             return "HEADING"
 
-        # 8. 非正文声明性文字（Declaration/Acknowledgement/Data Availability）
-        # 这些不作为标题，也不作为正文，直接跳过
+        # 8. 非正文声明性文字
         if re.match(r'^(Declaration of|Data Availability|Acknowledg|Conflict of)', text, re.I):
             return "SKIP"
+
+        # 8.5 目录、致谢、作者简介等不需要入库的部分
+        if re.match(r'^(目\s*录|图表目录|致\s*谢|作者简介|附\s*录|攻读.*期间)', text.strip()) and len(text) < 20:
+            return "SKIP"
+
+        # 8.6 公式行（含大量数学符号，不是标题）
+        if re.search(r'[=≈≤≥±∑∏∫αβγδθελμπσφψωΔΣΦ]', text) and not re.match(r'^第[一二三四五六七八九十\d]+章', text):
+            return "BODY"
 
         return "BODY"
 

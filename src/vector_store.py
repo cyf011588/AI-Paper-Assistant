@@ -1,196 +1,136 @@
 """
-vector_store.py — 向量数据库
+vector_store.py — ChromaDB 持久化向量存储（BGE embedding版）
 
-负责：
-1. 把 chunks 转成向量（Embedding）
-2. 存入 ChromaDB
-3. 提供语义检索接口：输入问题，返回最相关的 chunks
-
-关于 Embedding 模型：
-- ChromaDB 默认自带 all-MiniLM-L6-v2（英文效果好，中文一般）
-- 后面如果中文论文效果不好，可以换成 bge-small-zh 等中文模型
+替换原来的内存cosine_similarity方案：
+1. 数据持久化在磁盘上，重启不丢失
+2. 增量更新：上传新论文只add新数据，不重建索引
+3. 子块embedding存入，metadata带父块信息
 """
 
-import json
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 from pathlib import Path
 from typing import List, Dict, Optional
-
 import chromadb
 from chromadb.config import Settings
+from sentence_transformers import SentenceTransformer
 
-from config import DB_DIR, TOP_K
+from config import EMBEDDING_MODEL, DB_DIR
 from chunker import Chunk
 
 
 class VectorStore:
-    """向量数据库管理：入库 + 检索"""
+    """基于ChromaDB的持久化向量库"""
 
-    def __init__(self, collection_name: str = "paper_assistant"):
-        """
-        初始化向量数据库
-        collection_name 就像数据库里的一张表
-        """
-        # 确保目录存在
+    def __init__(self, collection_name: str = "paper_chunks"):
         DB_DIR.mkdir(parents=True, exist_ok=True)
 
-        # 连接本地 ChromaDB（持久化存储）
+        print(f"正在连接 ChromaDB 持久化存储: {DB_DIR} ...")
         self.client = chromadb.PersistentClient(
             path=str(DB_DIR),
-            settings=Settings(anonymized_telemetry=False),
+            settings=Settings(anonymized_telemetry=False)
         )
-
-        # 获取或创建 collection
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            metadata={"description": "Research paper knowledge base"},
+            metadata={"hnsw:space": "cosine"}
         )
+        print(f"ChromaDB 连接成功，当前已有 {self.collection.count()} 个向量")
+
+        # 加载BGE embedding模型
+        print(f"加载 Embedding 模型: {EMBEDDING_MODEL} ...")
+        self.model = SentenceTransformer(EMBEDDING_MODEL)
+        print("Embedding 模型加载完成！")
 
     def add_chunks(self, chunks: List[Chunk]):
-        """
-        把一批 chunks 存入向量数据库。
-
-        ChromaDB 会自动：
-        1. 调用 embedding 模型把文字转成向量
-        2. 存到本地磁盘
-        """
+        """增量添加新chunks到向量库"""
         if not chunks:
-            print("没有 chunks 需要入库")
             return
 
-        # ChromaDB 要求三个列表：ids, documents, metadatas
+        # 生成文档文本（带章节路径前缀）
+        documents = [f"[{c.section_path}] {c.text}" for c in chunks]
         ids = [c.id for c in chunks]
-        documents = [c.text for c in chunks]
-        metadatas = [
-            {
+        metadatas = []
+        for c in chunks:
+            metadatas.append({
                 "paper_name": c.paper_name,
                 "section_path": c.section_path,
                 "page_start": c.page_start,
                 "page_end": c.page_end,
-            }
-            for c in chunks
-        ]
+                "parent_id": c.parent_id,
+                "parent_text": c.parent_text[:2000] if c.parent_text else "",
+            })
 
-        # 分批入库（每批 100 条，避免一次性太大）
-        batch_size = 100
-        total = len(chunks)
-        for i in range(0, total, batch_size):
-            batch_ids = ids[i:i+batch_size]
-            batch_docs = documents[i:i+batch_size]
-            batch_meta = metadatas[i:i+batch_size]
+        # 用BGE模型生成embedding
+        print(f"正在为 {len(chunks)} 个新chunk生成向量...")
+        embeddings = self.model.encode(documents, show_progress_bar=True, batch_size=32).tolist()
 
-            self.collection.upsert(
-                ids=batch_ids,
-                documents=batch_docs,
-                metadatas=batch_meta,
-            )
-            print(f"  入库进度: {min(i+batch_size, total)}/{total}")
+        # 插入ChromaDB
+        self.collection.upsert(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas,
+            embeddings=embeddings,
+        )
+        print(f"已添加 {len(chunks)} 个chunk到向量库，当前共 {self.collection.count()} 个")
 
-        print(f"完成，共入库 {total} 个 chunks")
-
-    def search(self, query: str, top_k: int = TOP_K,
+    def search(self, query: str, top_k: int = 100,
                where: Optional[Dict] = None) -> List[Dict]:
-        """
-        语义检索：输入问题，返回最相关的 top_k 个 chunks。
+        """向量检索，返回top_k个结果"""
+        query_embedding = self.model.encode([query]).tolist()
 
-        返回格式：
-        [
-            {
-                "id": "...",
-                "text": "...",
-                "paper_name": "...",
-                "section_path": "...",
-                "page_start": 3,
-                "score": 0.85,  # 相似度分数，越高越相关
-            },
-            ...
-        ]
-        """
         results = self.collection.query(
-            query_texts=[query],
+            query_embeddings=query_embedding,
             n_results=top_k,
-            where=where,  # 可以加过滤条件，比如只搜某篇论文
+            where=where,
         )
 
-        # 整理成易读的格式
-        hits = []
-        if results["ids"] and results["ids"][0]:
-            for i in range(len(results["ids"][0])):
-                hit = {
-                    "id": results["ids"][0][i],
-                    "text": results["documents"][0][i],
-                    "paper_name": results["metadatas"][0][i].get("paper_name", ""),
-                    "section_path": results["metadatas"][0][i].get("section_path", ""),
-                    "page_start": results["metadatas"][0][i].get("page_start", 0),
-                    "page_end": results["metadatas"][0][i].get("page_end", 0),
-                    "score": 1 - results["distances"][0][i] if results["distances"] else 0,
-                }
-                hits.append(hit)
+        output = []
+        if not results["ids"] or not results["ids"][0]:
+            return output
 
-        return hits
+        for i, chunk_id in enumerate(results["ids"][0]):
+            meta = results["metadatas"][i] if False else results["metadatas"][0][i]
+            distance = results["distances"][0][i]
+            similarity = 1.0 - distance
+
+            output.append({
+                "id": chunk_id,
+                "text": results["documents"][0][i],
+                "paper_name": meta["paper_name"],
+                "section_path": meta["section_path"],
+                "page_start": int(meta["page_start"]),
+                "page_end": int(meta["page_end"]),
+                "parent_id": meta.get("parent_id", ""),
+                "parent_text": meta.get("parent_text", ""),
+                "score": float(similarity),
+            })
+
+        return output
+
+    def delete_by_paper(self, paper_name: str):
+        """删除某篇论文的所有chunks"""
+        self.collection.delete(where={"paper_name": paper_name})
+        print(f"已删除论文 '{paper_name}' 的所有向量")
+
+    def get_paper_names(self) -> List[str]:
+        """获取库中所有论文名"""
+        results = self.collection.get(include=["metadatas"])
+        papers = set()
+        for m in results["metadatas"]:
+            papers.add(m["paper_name"])
+        return sorted(papers)
 
     def count(self) -> int:
-        """当前数据库里有多少个 chunks"""
         return self.collection.count()
 
-    def clear(self):
-        """清空数据库（重新开始时用）"""
-        self.client.delete_collection(self.collection.name)
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection.name,
-            metadata={"description": "Research paper knowledge base"},
+    def add_figure(self, text: str, metadata: dict):
+        """存入figure_db集合"""
+        fig_col = self.client.get_or_create_collection("figure_db")
+        emb = self.model.encode([text]).tolist()
+        fig_col.add(
+            documents=[text],
+            ids=[f"fig_{metadata.get('figure_id', 'unknown')}_{hash(text) % 10000}"],
+            embeddings=emb,
+            metadatas=[metadata],
         )
-        print("数据库已清空")
-
-
-# =========================
-# 命令行测试
-# =========================
-
-if __name__ == "__main__":
-    import sys
-    from chunker import StructuralChunker
-    from config import PROCESSED_DIR
-
-    # 1. 读取 chunks JSON
-    chunk_files = list(PROCESSED_DIR.glob("*_chunks.json"))
-    if not chunk_files:
-        print("没有找到 chunks 文件，请先运行 chunker.py")
-        sys.exit()
-
-    chunks_file = chunk_files[0]
-    print(f"读取 chunks: {chunks_file.name}")
-
-    with open(chunks_file, "r", encoding="utf-8") as f:
-        chunk_dicts = json.load(f)
-
-    chunks = [Chunk(**c) for c in chunk_dicts]
-    print(f"共 {len(chunks)} 个 chunks\n")
-
-    # 2. 入库
-    store = VectorStore()
-    print(f"当前数据库已有: {store.count()} 个 chunks")
-
-    # 如果数据库是空的，才入库（避免重复）
-    if store.count() == 0:
-        print("开始入库...")
-        store.add_chunks(chunks)
-    else:
-        print("数据库已有数据，跳过入库（如需重新入库请调用 store.clear()）")
-
-    # 3. 测试检索
-    print("\n" + "=" * 70)
-    print("测试语义检索")
-    print("=" * 70)
-
-    test_queries = [
-        "What is the failure mode of the shear wall?",
-        "How does the steel plate contribute to shear resistance?",
-        "What are the material properties used in the test?",
-    ]
-
-    for q in test_queries:
-        print(f"\n问题: {q}")
-        results = store.search(q, top_k=3)
-        for i, r in enumerate(results):
-            print(f"  [{i+1}] score={r['score']:.3f} | p.{r['page_start']} | {r['section_path'][:60]}")
-            print(f"      {r['text'][:100]}...")

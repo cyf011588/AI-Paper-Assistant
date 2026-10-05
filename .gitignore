@@ -20,6 +20,7 @@ data/papers/
 data/processed/
 data/chroma_db/
 data/chroma/
+data/cache/
 *.pdf
 
 # 模型文件
