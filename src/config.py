@@ -73,7 +73,10 @@ try:
     from dotenv import load_dotenv
     load_dotenv(BASE_DIR / ".env", override=True)
 except ImportError:
-    pass
+    # 没装 python-dotenv：如果存在 .env 却读不到，明确提示，避免「填了 Key 却不生效」的困惑
+    if (BASE_DIR / ".env").exists():
+        print("[config] 警告：检测到 .env，但未安装 python-dotenv，配置不会被读取。\n"
+              "         请先安装依赖：pip install -r requirements.txt")
 
 # HuggingFace 国内镜像（如需更换，在 .env 里设 HF_ENDPOINT 即可）
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")

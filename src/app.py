@@ -618,6 +618,8 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
 
 
 if __name__ == "__main__":
+    # 端口可通过环境变量覆盖（默认 7860，行为与旧版一致）
+    port = int(os.environ.get("APP_PORT", "7860"))
     print("启动 AI Paper Assistant...")
-    print("浏览器打开 http://localhost:7860")
-    demo.launch(server_name="127.0.0.1", server_port=7860)
+    print(f"浏览器打开 http://localhost:{port}")
+    demo.launch(server_name="127.0.0.1", server_port=port)

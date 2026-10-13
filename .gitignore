@@ -22,11 +22,16 @@ config_local.py
 #   每位成员把自己的 PDF 放进 data/papers/，再本地重建索引：
 #       python scripts/build_index.py
 # ============================================================
-data/papers/
-data/processed/
-data/chroma_db/
-data/chroma/
-data/cache/
+data/papers/*
+data/processed/*
+data/chroma_db/*
+data/chroma/*
+data/cache/*
+# 但保留目录占位文件本身（git 不跟踪空目录，否则新 clone 会缺文件夹）
+!data/papers/.gitkeep
+!data/processed/.gitkeep
+!data/chroma_db/.gitkeep
+!data/cache/.gitkeep
 # 论文题录（标题/作者）—— 用 Web UI 上传论文时自动生成，格式模板见 .example.json
 data/paper_metadata.json
 *.pdf

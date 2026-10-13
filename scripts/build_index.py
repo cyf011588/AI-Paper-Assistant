@@ -62,10 +62,13 @@ def main() -> int:
     args = ap.parse_args()
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    PAPERS_DIR.mkdir(parents=True, exist_ok=True)
 
     pdfs = sorted(PAPERS_DIR.glob("*.pdf"))
     if not pdfs:
-        print(f"[build_index] {PAPERS_DIR} 下没有 PDF 文件，请先放入论文。")
+        print(f"[build_index] {PAPERS_DIR} 下没有 PDF 文件。")
+        print(f"             请把你的论文 PDF 拷进该目录后重跑本脚本。")
+        print(f"             （目录已自动创建；公开仓库不发布论文，语料需各人自备）")
         return 1
 
     print(f"[build_index] 发现 {len(pdfs)} 个 PDF，开始处理...\n")
