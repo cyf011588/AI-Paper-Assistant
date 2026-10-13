@@ -16,13 +16,29 @@ config_local.py
 # 注：src/config.py 已不含任何密钥（全部从 .env 读取），因此纳入版本管理，
 #     他人 clone 后无需再手工复制；参数总览见 src/config.py.example
 
-# 数据（不上传大文件）
+# ============================================================
+# 论文语料 —— 公开仓库不发布任何论文
+#   PDF 原文 / 解析产物 / 向量索引 / 题录 一律不入库。
+#   每位成员把自己的 PDF 放进 data/papers/，再本地重建索引：
+#       python scripts/build_index.py
+# ============================================================
 data/papers/
 data/processed/
 data/chroma_db/
 data/chroma/
 data/cache/
+# 论文题录（标题/作者）—— 用 Web UI 上传论文时自动生成，格式模板见 .example.json
+data/paper_metadata.json
 *.pdf
+
+# ============================================================
+# 评测集与评测结果 —— 含论文原文 / 衍生答案，不入公开仓库
+#   评测集格式见 evaluation/dataset/README.md，各方向在本地自建。
+#   example_dataset.json 是纯格式模板（不含任何真实论文内容），保留入库。
+# ============================================================
+evaluation/dataset/*.json
+!evaluation/dataset/example_dataset.json
+evaluation/eval_*.json
 
 # 本地运行时数据（各人自己的会话记录，不共享）
 data/session.db

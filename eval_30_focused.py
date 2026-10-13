@@ -9,7 +9,7 @@ sys.path.insert(0, 'src')
 
 from smart_retriever import SmartRetriever, RECALL_K
 from openai import OpenAI
-from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, EVAL_DATASET_PATH
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, require_eval_dataset
 from pathlib import Path
 from chunker import Chunk
 
@@ -23,10 +23,18 @@ for cf in Path("data/processed").glob("*_chunks.json"):
 retriever.build_index(all_chunks)
 
 # 加载评测集和baseline结果
-with open(EVAL_DATASET_PATH, "r", encoding="utf-8") as f:
-    dataset = json.load(f)
-with open("evaluation/eval_v3_result.json", "r", encoding="utf-8") as f:
-    baseline_results = json.load(f)
+# 注意：公开仓库不发布评测集与 baseline 结果，两者都需本地自备
+#   （baseline 即先用 evaluate_v2.py 跑一遍，生成 evaluation/eval_v3_result.json）
+try:
+    with open(require_eval_dataset(), "r", encoding="utf-8") as f:
+        dataset = json.load(f)
+    with open("evaluation/eval_v3_result.json", "r", encoding="utf-8") as f:
+        baseline_results = json.load(f)
+except FileNotFoundError as e:
+    print("[前置文件缺失] 本脚本需要「评测集」和「baseline 结果」两样东西。")
+    print(f"  {e}")
+    print("  baseline 生成方式：先跑一次 python evaluate_v2.py")
+    sys.exit(1)
 
 # comparison_decompose 的5个qid
 COMPARE_QIDS = {"q003", "q024", "q025", "q026", "q030"}

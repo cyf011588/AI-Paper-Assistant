@@ -1,0 +1,45 @@
+[
+  {
+    "question_id": "q001",
+    "question": "示例论文A 研究的核心构件是什么？",
+    "question_type": "按作者问",
+    "difficulty": "简单",
+    "retrieval_gt": {
+      "relevant_chunk_ids": [
+        "示例论文A_摘要_0002",
+        "示例论文A_第一章 绪论 / 1.3 本文研究内容_0040"
+      ],
+      "relevant_chapters": ["摘要", "1.3"],
+      "notes": "摘要与 1.3 节都直接给出了构件名称，两处任一命中即可算严格命中。"
+    },
+    "generation_gt": {
+      "standard_answer": "这里是标准答案：用一两句话写清结论，作为生成质量打分的参照。",
+      "source_chunks": [
+        "示例论文A_摘要_0002"
+      ],
+      "answer_type": "事实型"
+    }
+  },
+  {
+    "question_id": "q002",
+    "question": "示例论文A 和 示例论文B 在研究方法上有什么不同？",
+    "question_type": "跨论文对比",
+    "difficulty": "困难",
+    "retrieval_gt": {
+      "relevant_chunk_ids": [
+        "示例论文A_第二章 试验研究_0034",
+        "示例论文B_第二章 有限元模型 / 2.2 模型验证_0054"
+      ],
+      "relevant_chapters": ["2", "2.2"],
+      "notes": "对比题需要两篇论文各自的证据块都被召回，缺一即算不完整。"
+    },
+    "generation_gt": {
+      "standard_answer": "这里是标准答案：分点写清两者的相同点与不同点，并注明各自出处。",
+      "source_chunks": [
+        "示例论文A_第二章 试验研究_0034",
+        "示例论文B_第二章 有限元模型 / 2.2 模型验证_0054"
+      ],
+      "answer_type": "对比型"
+    }
+  }
+]

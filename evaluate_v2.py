@@ -17,17 +17,21 @@ import time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from config import PROCESSED_DIR, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, EVAL_DATASET_PATH
+from config import PROCESSED_DIR, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, require_eval_dataset
 from chunker import Chunk
 from smart_retriever import SmartRetriever
 from openai import OpenAI
 
 
-DATASET_PATH = str(EVAL_DATASET_PATH)
-
-
 def main():
-    with open(DATASET_PATH, "r", encoding="utf-8") as f:
+    # 公开仓库不发布评测集（含论文原文）——缺失时给出可操作提示而不是直接崩
+    try:
+        dataset_path = require_eval_dataset()
+    except FileNotFoundError as e:
+        print(e)
+        return 1
+
+    with open(dataset_path, "r", encoding="utf-8") as f:
         dataset = json.load(f)
     print(f"加载 {len(dataset)} 道测试题\n")
 

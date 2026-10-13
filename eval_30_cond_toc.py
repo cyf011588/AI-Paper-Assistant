@@ -10,7 +10,7 @@ sys.path.insert(0, 'src')
 from smart_retriever import SmartRetriever, RECALL_K, Chunk
 from reranker import Reranker
 from openai import OpenAI
-from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, EVAL_DATASET_PATH
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, require_eval_dataset
 from pathlib import Path
 from chunker import Chunk as ChunkerChunk
 
@@ -24,9 +24,13 @@ for cf in Path("data/processed").glob("*_chunks.json"):
 retriever.build_index(all_chunks)
 reranker = Reranker()
 
-# 加载评测集
-with open(EVAL_DATASET_PATH, "r", encoding="utf-8") as f:
-    dataset = json.load(f)
+# 加载评测集（公开仓库不发布评测集，需本地自备）
+try:
+    with open(require_eval_dataset(), "r", encoding="utf-8") as f:
+        dataset = json.load(f)
+except FileNotFoundError as e:
+    print(e)
+    sys.exit(1)
 
 # ---- Conditional-TOC 工具 ----
 SPECIFIC_TERMS = {

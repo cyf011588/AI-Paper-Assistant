@@ -63,7 +63,7 @@ python scripts/build_index.py          # ④ 一键重建 解析→分块→向�
 python src/app.py                      # 跑起来 → http://127.0.0.1:7860
 ```
 
-**核心思想：`git clone` 只拿「代码 + 评测集」，环境交给脚本，数据由脚本本地重建。**
+**核心思想：`git clone` 只拿「代码 + 文档」。环境交给脚本；论文、索引、评测集统统一在本地重建。**
 
 ---
 
@@ -73,8 +73,9 @@ python src/app.py                      # 跑起来 → http://127.0.0.1:7860
 |---|---|---|
 | 源码 `src/`、脚本、文档 | ✅ 进 | 协作的核心 |
 | `requirements*.txt`、`.env.example` | ✅ 进 | 环境可复现 |
-| **评测集 `evaluation/dataset/*.json`** | ✅ **必须进** | 它是「统一裁判」，人人必须是同一份 |
-| `evaluation/*.json`（评测产物） | ✅ 进（小） | 结果可复查、可对比 |
+| 评测集 `evaluation/dataset/*.json` | ⛔ 不进 | 含论文原文与衍生答案。repo 只放格式模板 `example_dataset.json`；**同一份评测集走群内共享（附 MD5）** |
+| `evaluation/*.json`（评测产物） | ⛔ 不进 | 含论文衍生答案，本地跑出来即可 |
+| `data/paper_metadata.json` | ⛔ 不进 | 论文题录，用 Web UI 上传论文时自动生成 |
 | `.env`（真实密钥） | ⛔ 不进 | 已 `.gitignore`；泄露即烧钱 |
 | `data/papers/*.pdf` | ⛔ 不进 | 版权 + 体积；走网盘/对象存储给「清单+MD5」 |
 | `data/processed/`、`data/chroma_db/`、`data/cache/` | ⛔ 不进 | 体积大、可脚本重建 |

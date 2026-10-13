@@ -44,8 +44,12 @@ git checkout -b feat/embedding-bge-m3
 
 ## 三、统一裁判（最重要）
 
-**`evaluation/dataset/` 下的 30 题评测集是全项目唯一的对比口径。**
-任何优化，必须跑同一套题，否则「结果不认」。
+**一套评测集就是全项目唯一的对比口径。** 任何优化，必须跑同一套题，否则「结果不认」。
+
+> ⚠️ 本仓库**不发布评测集**：它的问题、标准答案、`gold chunk id` 都来自具体论文。
+> 格式见 [`evaluation/dataset/README.md`](../evaluation/dataset/README.md)。
+> 同一组人必须**约定同一份评测集**（走群内/网盘共享，各自放进 `evaluation/dataset/`）。
+> 换语料 = 换评测集；换完之后旧分数不可直接比较。
 
 ### 怎么跑
 
@@ -54,8 +58,9 @@ git checkout -b feat/embedding-bge-m3
 python evaluate_v2.py                # 检索层 + 生成层的分层评测
 ```
 
-评测集路径由 `config.EVAL_DATASET_PATH` 统一定位（仓库内优先，老机器绝对路径回退），
-因此**任何机器跑的都是同一份题**，不再依赖某台机器的本地目录。
+评测集路径由 `config.EVAL_DATASET_PATH` 统一定位：自动选取 `evaluation/dataset/` 下的
+第一个 `*.json`（跳过 `example_dataset.json` 模板）。缺失时脚本会给出可操作提示，
+而不是直接抛 `FileNotFoundError`。「组内是否跑同一份题」靠约定，不靠仓库。
 
 ### 怎么记账
 
@@ -123,7 +128,9 @@ python scripts/build_index.py
 
 **确需共享语料时**（例如换学科）：走网盘 / 对象存储，给出**文件清单 + MD5**，不要直接塞 git。
 
-> 评测集是**例外**：`evaluation/dataset/*.json` **必须进 git**，它是统一裁判，人人必须有同一份。
+> ⚠️ 评测集与 `data/paper_metadata.json` 同样**不进 git**——它们含论文原文或题录。
+> repo 里只保留纯格式模板 `evaluation/dataset/example_dataset.json`；真实评测集由
+> 组内**约定同一份**，走群内共享（附 MD5），各自放进 `evaluation/dataset/`。
 
 ---
 

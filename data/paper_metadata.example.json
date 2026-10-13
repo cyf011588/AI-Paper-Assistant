@@ -1,0 +1,39 @@
+[
+  {
+    "paper_name": "示例论文A",
+    "title": "这里是论文的完整标题（英文标题原样填写）",
+    "authors": [
+      "Author One",
+      "Author Two"
+    ],
+    "author_aliases": [
+      "作者一",
+      "Author"
+    ],
+    "keywords": [
+      "关键词1",
+      "关键词2"
+    ],
+    "language": "zh",
+    "year": 2025,
+    "journal": "",
+    "thesis_type": "thesis"
+  },
+  {
+    "paper_name": "示例期刊论文B",
+    "title": "Title of the journal paper",
+    "authors": [
+      "Author Three"
+    ],
+    "author_aliases": [
+      "作者三"
+    ],
+    "keywords": [
+      "keyword1"
+    ],
+    "language": "en",
+    "year": 2024,
+    "journal": "Journal Name",
+    "thesis_type": "journal"
+  }
+]

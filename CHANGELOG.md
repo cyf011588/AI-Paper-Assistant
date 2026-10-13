@@ -1,5 +1,43 @@
 # 版本记录
 
+## v0.8 (2026-10-13) — 公开仓库只发布「可运行的框架」：论文与论文衍生数据全部移出
+
+> 目标：把这个仓库公开出去时，**只给别人能跑起来的东西**，不发布任何论文。
+> 课题组要用，自己把 PDF 放进 `data/papers/` 重建即可（`scripts/build_index.py`）。
+
+### 变更
+
+- **论文语料全面移出版本管理**（原已在 `.gitignore`，本次补齐遗漏项）：
+  `data/papers/`、`data/processed/`、`data/chroma_db/`、`data/cache/`、`*.pdf`。
+- **`data/paper_metadata.json` 移出**（论文题录：标题/作者）→ 新增格式模板
+  `data/paper_metadata.example.json`。题录会在用 Web UI 上传论文时自动生成。
+- **评测集与评测结果移出**：
+  - `evaluation/dataset/RAG分层评测数据集_*.json` → 移出；新增
+    `evaluation/dataset/README.md`（字段说明 + `gold chunk id` 怎么定）与
+    `evaluation/dataset/example_dataset.json`（纯格式模板，不含真实论文内容）。
+  - `evaluation/eval_v2_result.json`、`eval_v3_result.json`、`eval_cond_toc_3rounds.json`
+    → 移出（含论文衍生答案）。基线**数字**仍记录在 `EXPERIMENTS.md`（只是数字）。
+- **重写 git 历史**：上述文件在旧提交里已存在，仅 `git rm --cached` 不足以隐藏，
+  因此用 `git filter-branch` 从**所有历史提交**中移除 `data/paper_metadata.json` 与
+  `evaluation/`，再 `reflog expire` + `gc --prune=now` 清掉游离对象。
+  提交哈希因此全部改变（`initial`→`8629efc`、`v0.3`→`3e7a3bf`、`v0.7`→`3d5618e`）。
+- **`config.py`**：
+  - `_resolve_eval_dataset()` 改为自动选取 `evaluation/dataset/` 下第一个 `*.json`
+    （跳过 `example_dataset.json`），不再写死文件名。
+  - 新增 `EVAL_DATASET_AVAILABLE` 与 `require_eval_dataset()`——缺少评测集时抛出
+    **带操作指引**的异常。
+- **评测入口容错**：`evaluate_v2.py`、`eval_30_focused.py`、`eval_30_cond_toc.py`
+  在缺少评测集/baseline 时打印下一步该怎么做并退出，不再裸抛 `FileNotFoundError`。
+- **`scripts/bootstrap.py`**：评测集缺失不再标成 `[MISS]`（新 clone 本来就该没有），
+  改为 `[INFO]` + 放置说明。
+- **文档同步**：`README.md`、`docs/ONBOARDING.md`、`docs/COLLABORATION.md`、
+  `docs/DISTRIBUTION.md` 全部改为「论文/评测集本地自备」的口径。
+
+### 不变
+
+- 业务逻辑、检索/生成算法、默认参数**一行未改**。
+- `data/mechanics_mapping.json`（力学现象→通俗解释，通用领域知识）仍在库中。
+
 ## v0.7 (2026-10-13) — 协作层：统一裁判 + 数据契约 + 分发方案
 
 > 目标：让「不同电脑、不同人、各自方向」并行优化时**互不打架、结果可比较**。

@@ -22,27 +22,44 @@ DB_DIR = DATA_DIR / "chroma_db"           # 向量数据库存储位置
 CACHE_DIR = DATA_DIR / "cache"            # embedding向量缓存
 METADATA_PATH = DATA_DIR / "paper_metadata.json"  # 论文元数据
 EVAL_DIR = BASE_DIR / "evaluation"        # 评测产物目录
-DATASET_PATH = EVAL_DIR / "dataset"       # 评测集（已纳入版本管理，是唯一的「统一裁判」）
+DATASET_PATH = EVAL_DIR / "dataset"       # 评测集目录（公开仓库不含评测集，各方向在本地自建）
 
 
 def _resolve_eval_dataset() -> Path:
     """定位评测集。
 
-    优先级：仓库内 evaluation/dataset/*.json  >  历史机器上的绝对路径。
-    这样任何机器 clone 下来都能跑同一套题；老机器行为不变。
+    公开仓库**不发布评测集**（它含论文原文与衍生内容）。每位成员把自己的评测集
+    放进 evaluation/dataset/ 即可，文件名随意；格式见 evaluation/dataset/README.md
+    与其中的 example_dataset.json。
+
+    优先级：仓库内 evaluation/dataset/*.json（排除 example）  >  历史机器上的绝对路径。
     """
-    in_repo = DATASET_PATH / "RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json"
-    if in_repo.exists():
-        return in_repo
     if DATASET_PATH.exists():
-        found = sorted(DATASET_PATH.glob("*.json"))
+        found = sorted(p for p in DATASET_PATH.glob("*.json")
+                       if p.name != "example_dataset.json")
         if found:
             return found[0]
     legacy = Path(r"F:\RAG评估\ai-paper-pinggu\RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json")
-    return legacy if legacy.exists() else in_repo
+    return legacy if legacy.exists() else (DATASET_PATH / "your_dataset.json")
 
 
 EVAL_DATASET_PATH = _resolve_eval_dataset()
+EVAL_DATASET_AVAILABLE = EVAL_DATASET_PATH.exists()
+
+
+def require_eval_dataset() -> Path:
+    """返回评测集路径；缺失时抛出带操作指引的异常。
+
+    评测脚本统一用这个函数取数据集，避免 clone 下来直接 FileNotFoundError。
+    """
+    if EVAL_DATASET_AVAILABLE:
+        return EVAL_DATASET_PATH
+    raise FileNotFoundError(
+        "\n[评测集缺失] 公开仓库不发布评测集（含论文原文）。\n"
+        f"  请把自己的评测集 JSON 放到：{DATASET_PATH}\n"
+        "  字段格式见 evaluation/dataset/README.md 与 example_dataset.json\n"
+        "  文件名任意（*.json），脚本会自动选取。\n"
+    )
 
 # =========================
 # 读取 .env（可选）

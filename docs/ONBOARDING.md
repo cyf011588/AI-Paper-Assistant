@@ -71,18 +71,23 @@
 | `processed/` | 13 组 `*_chunks.json` + `*_structured.json`（解析产物） | 不进（可重建） |
 | `chroma_db/` | ChromaDB 持久化（当前 1601 条向量） | 不进（可重建） |
 | `cache/` | 约 1500 个 embedding 向量缓存 | 不进（可重建） |
-| `paper_metadata.json` | 论文元数据（论文名/作者/年份/期刊） | **进** |
-| `mechanics_mapping.json` | 力学现象 → 通俗解释映射（供图片描述用） | 进 |
+| `paper_metadata.json` | 论文题录（论文名/作者/年份/期刊）—— 用 Web UI 上传论文时自动生成 | **不进** |
+| `paper_metadata.example.json` | 题录格式模板 | 进 |
+| `mechanics_mapping.json` | 力学现象 → 通俗解释映射（供图片描述用，不含论文内容） | 进 |
 | `session.db` | SQLite 会话库 | 不进 |
 
 ### 1.6 评测 —— `evaluation/`
 
-| 项 | 说明 |
-|---|---|
-| `dataset/RAG分层评测数据集_*.json` | **30 题评测集。进 git。全项目唯一的「统一裁判」，绝不能改** |
-| `eval_v3_result.json` | 当前基线（strict 78.9% / 扩展后 89.2% / 生成 7.53） |
-| `eval_v2_result.json` | 上一版（旧口径 recall 73.9%，**与新口径不可直接比**） |
-| `eval_cond_toc_3rounds.json` | Conditional-TOC 负结果（3 轮） |
+| 项 | 说明 | 是否进 git |
+|---|---|---|
+| `dataset/README.md` | **评测集字段说明 + `gold chunk id` 怎么定** | 进 |
+| `dataset/example_dataset.json` | 纯格式模板（不含任何真实论文内容） | 进 |
+| `dataset/*.json`（你自己的评测集） | 评测集。**本仓库不发布**，人人本地自备 | **不进** |
+| `eval_*.json`（评测结果，如 `eval_v3_result.json`） | 含论文衍生答案，本地跑出来即可 | **不进** |
+
+> 本仓库**不发布评测集**：它的问题、标准答案、`gold chunk id` 都来自具体论文。
+> 历史上的基线数字（strict 78.9% / 扩展后 89.2% / 生成 7.53）记录在
+> [`EXPERIMENTS.md`](../EXPERIMENTS.md) 里，那只是数字，不含论文内容。
 
 ### 1.7 文档
 
@@ -114,7 +119,7 @@
 ## 2. 你要怎么做（从零到跑起来，6 步）
 
 ```bash
-# 1. 拿代码（代码 + 评测集，不含语料与索引）
+# 1. 拿代码（只有代码 + 文档；论文、索引、评测集都在本地自备）
 git clone https://github.com/<账号>/AI-Paper-Assistant.git
 cd AI-Paper-Assistant
 

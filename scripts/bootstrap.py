@@ -127,8 +127,12 @@ def check_data(cfg):
     print(f"{'[ OK ]' if chunks else '[MISS]'} 解析分块      : {len(chunks)} 份  (data/processed/*_chunks.json)")
     print(f"{'[ OK ]' if chroma.exists() else '[MISS]'} 向量库        : {'已建立' if chroma.exists() else '未建立'}  (data/chroma_db/)")
     if dataset is not None:
-        exists = dataset.exists()
-        print(f"{'[ OK ]' if exists else '[MISS]'} 评测集(统一裁判): {'已就位' if exists else '缺失'}  {dataset.name if exists else dataset}")
+        if dataset.exists():
+            print(f"{OK} 评测集(统一裁判): 已就位  {dataset.name}")
+        else:
+            print("[INFO] 评测集(统一裁判): 尚未自备")
+            print("       公开仓库不发布评测集（含论文原文）。把自己的评测集 JSON 放进")
+            print("       evaluation/dataset/ 即可，格式见该目录 README.md 与 example_dataset.json")
     return bool(papers), bool(chunks), chroma.exists()
 
 
@@ -146,6 +150,7 @@ def next_steps(cfg_ok, missing_core, papers_ok, chunks_ok, chroma_ok):
         steps.append("4) 重建索引：        python scripts/build_index.py")
     steps.append("5) 启动问答界面：    python src/app.py   （浏览器打开 http://127.0.0.1:7860）")
     steps.append("6) 跑统一评测：      python evaluate_v2.py")
+    steps.append("   （需先自备评测集：放进 evaluation/dataset/，见该目录 README.md）")
 
     for s in steps:
         print("   " + s)
