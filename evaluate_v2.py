@@ -1,6 +1,11 @@
 """
 evaluate_v2.py — RAG分层评估（检索层 + 生成层）
 使用专业评测数据集JSON
+
+v3: 修正Recall口径
+- strict_recall_at_10: 只看 pre_expansion top10（reranker后，expand前）
+- recall_after_expansion: 看 post_expansion 全部
+- retrieval_mode: hybrid_rerank / section_shortcut / comparison_decompose / section_list
 """
 
 import os
@@ -12,13 +17,13 @@ import time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from config import PROCESSED_DIR, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+from config import PROCESSED_DIR, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, EVAL_DATASET_PATH
 from chunker import Chunk
 from smart_retriever import SmartRetriever
 from openai import OpenAI
 
 
-DATASET_PATH = "F:/RAG评估/ai-paper-pinggu/RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json"
+DATASET_PATH = str(EVAL_DATASET_PATH)
 
 
 def main():
@@ -48,26 +53,33 @@ def main():
 
         print(f"[{i+1}/{len(dataset)}] {qid}: {question[:50]}...")
 
-        # 检索层
+        # 检索
         output = retriever.search(question, top_k=10)
-        retrieved = output["results"]
-        retrieved_ids = set(r["id"] for r in retrieved)
-        hit_chunks = gt_chunk_ids & retrieved_ids
-        recall_at_10 = len(hit_chunks) / len(gt_chunk_ids) if gt_chunk_ids else 0
+        debug = output.get("debug_info", {})
+        retrieval_mode = debug.get("retrieval_mode", "unknown")
 
-        # 生成层 — 走和网页上一样的generator.py
+        pre_ids = debug.get("pre_expansion_ids", [])
+        post_ids = debug.get("post_expansion_ids", [])
+
+        # strict Recall@10: 只看 pre_expansion 前10个
+        pre_top10 = pre_ids[:10]
+        strict_recall = len(gt_chunk_ids & set(pre_top10)) / len(gt_chunk_ids) if gt_chunk_ids else 0
+
+        # recall after expansion: 看 post_expansion 全部
+        recall_after_exp = len(gt_chunk_ids & set(post_ids)) / len(gt_chunk_ids) if gt_chunk_ids else 0
+
+        # 生成层（暂时不改）
         from generator import AnswerGenerator
         gen = AnswerGenerator()
-        gen_result = gen.generate(question, retrieved[:50])
+        gen_result = gen.generate(question, output["results"][:50])
         generated_answer = gen_result["answer"]
 
-        # 打分
+        # LLM打分
         try:
             eval_resp = llm.chat.completions.create(
                 model="deepseek-chat",
                 messages=[
-                    {"role": "system", "content": """对比问题、标准答案和生成答案，给生成答案打分（0-10分）。
-9-10=完全正确，6-8=基本正确有遗漏，3-5=部分正确，0-2=错误。只输出数字。"""},
+                    {"role": "system", "content": "对比问题、标准答案和生成答案，给生成答案打分（0-10分）。9-10=完全正确，6-8=基本正确有遗漏，3-5=部分正确，0-2=错误。只输出数字。"},
                     {"role": "user", "content": f"问题：{question}\n标准答案：{standard_answer}\n生成答案：{generated_answer}"}
                 ],
                 temperature=0.0,
@@ -79,48 +91,63 @@ def main():
             gen_score = 0
 
         results.append({
-            "qid": qid, "question": question, "type": qtype,
+            "qid": qid,
+            "question": question,
+            "type": qtype,
             "difficulty": difficulty,
-            "recall_at_10": round(recall_at_10, 2),
+            "retrieval_mode": retrieval_mode,
+            "pre_expansion_top10_ids": pre_top10,
+            "post_expansion_ids": post_ids,
+            "gold_chunk_ids": list(gt_chunk_ids),
+            "strict_recall_at_10": round(strict_recall, 2),
+            "recall_after_expansion": round(recall_after_exp, 2),
             "gen_score": gen_score,
             "generated_answer": generated_answer[:500],
         })
-        print(f"  Recall@10={recall_at_10:.0%}  生成={gen_score}/10")
+        print(f"  mode={retrieval_mode:20s}  strict_R@10={strict_recall:.0%}  after_exp={recall_after_exp:.0%}  gen={gen_score}/10")
         time.sleep(0.3)
 
-    # 汇总
-    print("\n" + "="*60)
-    print("RAG分层评估报告")
-    print("="*60)
-    by_type = {}
-    for r in results:
-        t = r["type"]
-        if t not in by_type:
-            by_type[t] = [0, 0, 0, 0]  # count, recall_sum, gen_sum
-        by_type[t][0] += 1
-        by_type[t][1] += r["recall_at_10"]
-        by_type[t][2] += r["gen_score"]
-        by_type[t][3] += 1
+    # ===== 汇总 =====
+    print("\n" + "="*70)
+    print("RAG分层评估报告（v3 修正口径）")
+    print("="*70)
 
-    print(f"\n{'题型':<10} {'题数':<5} {'Recall@10':<12} {'生成均分':<10}")
-    print("-"*45)
-    tr = tg = tn = 0
-    for t, (n, rs, gs, _) in by_type.items():
-        print(f"{t:<10} {n:<5} {rs/n:<12.0%} {gs/n:<10.1f}")
-        tr += rs; tg += gs; tn += n
-    print("-"*45)
-    print(f"{'总计':<10} {tn:<5} {tr/tn:<12.0%} {tg/tn:<10.1f}")
+    # 全部
+    all_strict = [r["strict_recall_at_10"] for r in results]
+    all_after = [r["recall_after_expansion"] for r in results]
+    all_gen = [r["gen_score"] for r in results]
+    print(f"\n全部30题:")
+    print(f"  Strict Recall@10    = {sum(all_strict)/len(all_strict):.1%}")
+    print(f"  Recall after expand = {sum(all_after)/len(all_after):.1%}")
+    print(f"  生成均分            = {sum(all_gen)/len(all_gen):.1f}/10")
+
+    # 按retrieval_mode分组
+    by_mode = {}
+    for r in results:
+        m = r["retrieval_mode"]
+        if m not in by_mode:
+            by_mode[m] = []
+        by_mode[m].append(r)
+
+    print(f"\n按检索模式分组:")
+    for mode, rs in by_mode.items():
+        s = sum(r["strict_recall_at_10"] for r in rs) / len(rs)
+        a = sum(r["recall_after_expansion"] for r in rs) / len(rs)
+        print(f"  {mode:25s}: {len(rs)}题  strict_R@10={s:.0%}  after_exp={a:.0%}")
 
     # 失败题
-    failed = [r for r in results if r["recall_at_10"] < 0.5 or r["gen_score"] < 5]
+    failed = [r for r in results if r["strict_recall_at_10"] < 0.5]
     if failed:
-        print(f"\n需要改进 ({len(failed)}题):")
+        print(f"\nStrict Recall@10 < 50% 的题 ({len(failed)}题):")
         for r in failed:
-            print(f"  [{r['qid']}] R={r['recall_at_10']:.0%} G={r['gen_score']}/10 | {r['question'][:45]}")
+            print(f"  [{r['qid']}] mode={r['retrieval_mode']:20s} strict={r['strict_recall_at_10']:.0%} | {r['question'][:50]}")
 
-    with open("evaluation/eval_v2_result.json", "w", encoding="utf-8") as f:
+    # 保存
+    out_dir = Path("evaluation")
+    out_dir.mkdir(exist_ok=True)
+    with open(out_dir / "eval_v3_result.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
-    print("\n结果已保存 evaluation/eval_v2_result.json")
+    print(f"\n结果已保存 evaluation/eval_v3_result.json")
 
 
 if __name__ == "__main__":

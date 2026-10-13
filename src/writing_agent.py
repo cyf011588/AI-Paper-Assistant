@@ -15,11 +15,13 @@ from config import (DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL,
 
 class WritingState(TypedDict):
     user_request: str
+    user_viewpoint: str         # 用户初步力学分析
     image_path: str
-    template_text: str           # 文献模板
+    template_text: str
     style_cases: str
-    figure_features: str         # figure_db检索到的图片特征
-    mechanism_chain: str         # 机制推理因果链
+    figure_features: str
+    intent_mode: str            # 整体趋势/局部状态/参数对比/理论推演
+    mechanism_chain: str
     draft: str
     final_text: str
     review_feedback: str
@@ -112,35 +114,80 @@ class WritingAgent:
             "history": [f"[检索员] author={author}, chapter={chapter}, 模板{len(template_text)//400}块, 图{len(figure_features)//100}个"]
         }
 
-    def _mechanism_node(self, state: WritingState) -> dict:
-        """节点1.5：机制推理员——推理塑性发展因果链"""
-        print("  [节点1.5] 机制推理员：分析图表特征...")
-
-        features = state.get("figure_features", "")
-        if not features:
-            return {"mechanism_chain": "", "history": state.get("history", [])}
+    def _intent_router_node(self, state: WritingState) -> dict:
+        """节点1.3：意图路由——判断写作场景类型"""
+        print("  [节点1.3] 意图路由：分析写作场景...")
 
         resp = self.ds_client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "user", "content": f"""以下是同一试件在不同荷载步（A点、B点、C点）的应力云图特征。请进行纵向对比：
+            messages=[{"role": "user", "content": f"""分析以下写作需求属于哪种模式，只输出一个词：
 
-【图表特征】
+需求：{state['user_request']}
+
+可选模式：
+- 整体趋势：描述全过程、阶段划分、受力发展
+- 局部状态：分析某一点(如B点)、某个构件的应力状态
+- 参数对比：对比不同试件、不同参数(如轴压比、钢板厚度)
+- 理论推演：全新构件、知识库没有的内容
+
+只输出一个词："""}],
+            temperature=0.1,
+        )
+        mode = resp.choices[0].message.content.strip()
+        print(f"  识别为: {mode}")
+        return {"intent_mode": mode, "history": state.get("history", []) + [
+            f"[意图路由] {mode}"
+        ]}
+
+    def _mechanism_node(self, state: WritingState) -> dict:
+        """节点1.5：机制推理员——根据意图模式用不同Prompt"""
+        print("  [节点1.5] 机制推理员：分析图表特征...")
+
+        features = state.get("figure_features", "")
+        mode = state.get("intent_mode", "整体趋势")
+        user_viewpoint = state.get("user_viewpoint", "")
+
+        # 读mechanics_mapping
+        try:
+            import json
+            with open("data/mechanics_mapping.json", "r", encoding="utf-8") as f:
+                mapping = json.load(f)
+        except:
+            mapping = {}
+
+        if not features and not user_viewpoint:
+            return {"mechanism_chain": "", "history": state.get("history", [])}
+
+        # 根据模式选Prompt
+        prompts = {
+            "整体趋势": "请按荷载步时序纵向对比，回答：触发屈服的构件是什么？塑性区如何扩展？哪个构件失稳导致刚度退化？",
+            "局部状态": "请空间分析该时刻云图。回答：该构件的应力分布特征？屈服区在哪？主导应力是什么？是否发生局部屈曲？",
+            "参数对比": "请对比不同试件的云图特征。回答：参数变化导致哪个区域应力显著改变？破坏模式有何转变？结合曲线数据解释机理。",
+            "理论推演": "你是资深结构工程专家。当前分析的是全新构件，缺乏历史文献直接支撑。请基于基础力学原理进行推演。如果无法解释，必须明确输出'【需人工补充力学机制】'，严禁强行编造。"
+        }
+        reasoning_prompt = prompts.get(mode, prompts["整体趋势"])
+
+        resp = self.ds_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": f"""【图表特征】
 {features}
 
-请按以下顺序分析：
-1. 从A点到B点，哪个区域的应力显著增加？塑性区扩展方向是什么？
-2. 从B点到C点，是否有新的部件进入屈服？是否有局部屈曲或鼓曲现象出现？
-3. 将这个过程总结为一段"受力全过程叙述"。
+【用户初步分析】（用户已有的力学判断，请严格基于此展开）
+{user_viewpoint or '（无）'}
 
-特别注意各部件（钢板、混凝土板、梁、柱）的屈服先后顺序。
-输出300字以内："""}],
+【力学现象映射表】（常见现象→力学含义）
+{mapping}
+
+{reasoning_prompt}
+
+输出300字以内，列出结构化的"力学事实清单"："""}],
             temperature=0.2,
         )
         chain = resp.choices[0].message.content.strip()
         print(f"  推理完成：{chain[:80]}...")
 
         return {"mechanism_chain": chain, "history": state.get("history", []) + [
-            f"[机制推理] 完成因果链分析"
+            f"[机制推理] {mode}模式完成"
         ]}
 
     def _writer_node(self, state: WritingState) -> dict:
@@ -194,6 +241,9 @@ class WritingAgent:
 
 【机制推理】：以下是根据图表特征推理出的塑性发展因果链，请融入写作中：
 {state.get('mechanism_chain', '（无）')}
+
+【用户初步分析】（用户已有的力学判断，请严格基于此润色，绝对禁止添加用户未提及的力学机制或结论）：
+{state.get('user_viewpoint', '（无）')}
 
 【硬性要求】：
 1. 所有数据必须来自用户上传的图片，不得从模板或风格案例中复制任何数值。
@@ -305,13 +355,15 @@ class WritingAgent:
     def _build_graph(self):
         workflow = StateGraph(WritingState)
         workflow.add_node("retriever", self._retriever_node)
+        workflow.add_node("intent_router", self._intent_router_node)
         workflow.add_node("mechanism", self._mechanism_node)
         workflow.add_node("writer", self._writer_node)
         workflow.add_node("dedup", self._dedup_node)
         workflow.add_node("reviewer", self._reviewer_node)
 
         workflow.set_entry_point("retriever")
-        workflow.add_edge("retriever", "mechanism")
+        workflow.add_edge("retriever", "intent_router")
+        workflow.add_edge("intent_router", "mechanism")
         workflow.add_edge("mechanism", "writer")
         workflow.add_edge("writer", "dedup")
         workflow.add_edge("dedup", "reviewer")
@@ -323,9 +375,10 @@ class WritingAgent:
         )
         return workflow.compile()
 
-    def run(self, user_request: str, image_path: str = "") -> dict:
+    def run(self, user_request: str, image_path: str = "", user_viewpoint: str = "") -> dict:
         initial: WritingState = {
             "user_request": user_request,
+            "user_viewpoint": user_viewpoint,
             "image_path": image_path,
             "template_text": "",
             "style_cases": "",

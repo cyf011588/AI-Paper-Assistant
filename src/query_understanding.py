@@ -20,8 +20,10 @@ import re
 from pathlib import Path
 from typing import List, Dict, Optional
 
+from config import METADATA_PATH
 
-METADATA_FILE = Path("F:/AI_Project/AI-Paper-Assistant/data/paper_metadata.json")
+
+METADATA_FILE = METADATA_PATH
 
 
 class QueryUnderstanding:

@@ -233,6 +233,30 @@ Only output the English translation, nothing else."""},
                 r["text"] = r["parent_text"]
         return results[:top_k]
 
+    @staticmethod
+    def _match_section_number(section_path: str, target_num: str) -> bool:
+        """结构化章节匹配：
+        target="4"   → 匹配 "第四章..."、"4.1..."、"4.7.3..."，不匹配 "2.1.4..."、"3.4..."
+        target="4.6" → 匹配 "4.6..."、"4.6.1..."，不匹配 "3.4.6..."、"5.4.6..."
+        """
+        import re as _re
+        cn_map = {"一":"1","二":"2","三":"3","四":"4","五":"5",
+                  "六":"6","七":"7","八":"8","九":"9","十":"10"}
+        for part in section_path.split(" / "):
+            # 匹配 "4.3 xxx" 或 "4.3.1 xxx" 这种以数字章节号开头的段
+            m = _re.match(r'^(\d+(?:\.\d+)*)\s', part)
+            if m:
+                sec_num = m.group(1)
+                if sec_num == target_num or sec_num.startswith(target_num + "."):
+                    return True
+            # 匹配 "第四章 xxx" 这种中文数字章
+            m2 = _re.match(r'^第([一二三四五六七八九十\d]+)章', part)
+            if m2:
+                ch = cn_map.get(m2.group(1), m2.group(1))
+                if ch == target_num:
+                    return True
+        return False
+
     def _brainstorm_query(self, question: str) -> str:
         """问题头脑风暴：用LLM生成'答案可能在的章节类型'，扩展检索词。"""
         from openai import OpenAI
@@ -277,9 +301,9 @@ Only output the English translation, nothing else."""},
         # 2. 在该论文内混合检索
         results = self._search_single_paper(expanded_query, paper_name, top_k=RECALL_K)
 
-        # 3. Reranker精排
+        # 3. Reranker精排（使用与向量/BM25相同的 expanded_query）
         if results and self.reranker:
-            results = self.reranker.rerank(query, results, top_k=top_k)
+            results = self.reranker.rerank(expanded_query, results, top_k=top_k)
 
         return results[:top_k]
 
@@ -371,10 +395,18 @@ Only output the English translation, nothing else."""},
 
                 if all_grouped:
                     print(f"  [查询分解] 共检索到{len(all_grouped)}个chunk（分{len(sub_queries)}组）")
-                    return {"results": all_grouped, "query_info": query_info}
+                    return {
+                        "results": all_grouped,
+                        "query_info": query_info,
+                        "debug_info": {
+                            "retrieval_mode": "comparison_decompose",
+                            "pre_expansion_ids": [r["id"] for r in all_grouped],
+                            "post_expansion_ids": [r["id"] for r in all_grouped],
+                        }
+                    }
 
         # 1.5 特殊问题：问"有几个章节/目录/结构"时，直接返回章节列表
-        if target_papers and any(kw in content_query for kw in ["章节", "目录", "结构", "几个章", "有几章"]):
+        if target_papers and any(kw in content_query for kw in ["章节", "目录", "几个章", "有几章"]):
             results = []
             for paper_name in target_papers:
                 paper_chunks = self.paper_chunks_map.get(paper_name, [])
@@ -396,7 +428,15 @@ Only output the English translation, nothing else."""},
                             "score": 1.0,
                         })
             if results:
-                return {"results": results, "query_info": query_info}
+                return {
+                    "results": results,
+                    "query_info": query_info,
+                    "debug_info": {
+                        "retrieval_mode": "section_list",
+                        "pre_expansion_ids": [r["id"] for r in results],
+                        "post_expansion_ids": [r["id"] for r in results],
+                    }
+                }
 
         # 2. 如果是中文query，判断目标论文是中文还是英文内容：
         #    - 中文论文（chunks是中文）→ 不翻译，直接用中文检索
@@ -518,6 +558,15 @@ Only output the English translation, nothing else."""},
                 hit_section_kw = kw
                 break
 
+        # 只有结构性关键词才允许触发 shortcut（"试验""结论"等真正对应章节名）
+        # "方法""设计""分析"等泛化词不触发 shortcut，只用于章节名加权
+        shortcut_trigger_keywords = ["摘要", "引言", "绪论", "试验", "结论", "总结"]
+        hit_shortcut_kw = None
+        for kw in shortcut_trigger_keywords:
+            if kw in query_lower:
+                hit_shortcut_kw = kw
+                break
+
         # 特殊处理：query提到"英文摘要"时，强制把Abstract章节chunks加入
         if "英文摘要" in content_query or "abstract" in query_lower:
             for paper_name in (target_papers or []):
@@ -559,21 +608,19 @@ Only output the English translation, nothing else."""},
             if m:
                 hit_section_num = m.group(1)
 
-        if target_papers and (hit_section_kw or hit_section_num) and not is_comparison:
+        # 3.6 章节号匹配 / 结构性关键词匹配
+        #    hit_section_num（章节号）和 hit_shortcut_kw（摘要/试验/结论等）都允许触发
+        #    hit_section_kw 中的"方法""设计""分析"等泛化词不触发 shortcut
+        if target_papers and (hit_section_num or hit_shortcut_kw) and not is_comparison:
             for paper_name in target_papers:
                 for c in self.paper_chunks_map.get(paper_name, []):
-                    # 先匹配章节关键词
                     matched = False
-                    if hit_section_kw:
-                        section_no_space = c.section_path.replace(" ", "").lower()
-                        kw_no_space = hit_section_kw.replace(" ", "").lower()
-                        if kw_no_space in section_no_space:
+                    if hit_section_num and self._match_section_number(c.section_path, hit_section_num):
+                        matched = True
+                    if not matched and hit_shortcut_kw:
+                        sp = c.section_path.replace(" ", "").lower()
+                        if hit_shortcut_kw.replace(" ", "").lower() in sp:
                             matched = True
-                    # 再匹配章节号
-                    if hit_section_num and not matched:
-                        if hit_section_num in c.section_path:
-                            matched = True
-
                     if matched:
                         already = any(r["id"] == c.id for r in all_results)
                         if not already:
@@ -628,21 +675,17 @@ Only output the English translation, nothing else."""},
         filtered = sorted(filtered, key=lambda x: x["score"], reverse=True)
 
         # 5. Reranker 精排：从召回的候选里挑出最相关的
-        #    如果已经通过章节号/关键词精确匹配到了章节，跳过Reranker直接返回
-        if target_papers and (hit_section_kw or hit_section_num) and not is_comparison:
-            # 精确匹配到了章节，直接返回该章节所有chunks
+        #    如果已通过章节号或结构性关键词精确匹配到了章节，跳过Reranker直接返回
+        if target_papers and (hit_section_num or hit_shortcut_kw) and not is_comparison:
             results = []
             for paper_name in target_papers:
                 for c in self.paper_chunks_map.get(paper_name, []):
-                    # 检查这个chunk是否匹配章节关键词或章节号
                     matched = False
-                    if hit_section_kw:
-                        section_no_space = c.section_path.replace(" ", "").lower()
-                        kw_no_space = hit_section_kw.replace(" ", "").lower()
-                        if kw_no_space in section_no_space:
-                            matched = True
-                    if hit_section_num and not matched:
-                        if hit_section_num in c.section_path:
+                    if hit_section_num and self._match_section_number(c.section_path, hit_section_num):
+                        matched = True
+                    if not matched and hit_shortcut_kw:
+                        sp = c.section_path.replace(" ", "").lower()
+                        if hit_shortcut_kw.replace(" ", "").lower() in sp:
                             matched = True
                     if matched:
                         results.append({
@@ -659,12 +702,23 @@ Only output the English translation, nothing else."""},
                 return {
                     "results": results,
                     "query_info": query_info,
+                    "debug_info": {
+                        "retrieval_mode": "section_shortcut",
+                        "pre_expansion_ids": [r["id"] for r in results],
+                        "post_expansion_ids": [r["id"] for r in results],
+                    }
                 }
 
         if filtered and self.reranker:
             # 精排前20个候选（章节名加权后前面的）
             candidates_for_rerank = filtered[:20]
+            # ---- debug: 记录 reranker 前的真实 candidates ----
+            pre_rerank_ids = [r["id"] for r in candidates_for_rerank]
             filtered = self.reranker.rerank(content_query, candidates_for_rerank, top_k=top_k)
+            post_rerank_ids = [r["id"] for r in filtered]
+        else:
+            pre_rerank_ids = [r["id"] for r in filtered[:20]]
+            post_rerank_ids = [r["id"] for r in filtered[:top_k]]
 
         # query提到"英文摘要"时，先把Abstract chunks加回来
         if "英文摘要" in content_query:
@@ -675,6 +729,8 @@ Only output the English translation, nothing else."""},
             print(f"  [强制排序] 从{len(abstract_in_all)}个Abstract chunks中加入{len(abstract_new)}个新的到前面")
 
         # 6. 上下文扩展（章节级聚合 + 相邻扩展）
+        # ---- debug: 记录 expand 前的 ids（reranker 后） ----
+        pre_expansion_ids = [r["id"] for r in filtered]
         expanded = self._expand_neighbors(filtered)
 
         # query提到"英文摘要"时，最后再把Abstract chunks排到最前面
@@ -712,6 +768,13 @@ Only output the English translation, nothing else."""},
         return {
             "results": results,
             "query_info": query_info,
+            "debug_info": {
+                "retrieval_mode": "hybrid_rerank",
+                "pre_expansion_ids": pre_expansion_ids,
+                "post_expansion_ids": [r["id"] for r in expanded],
+                "pre_rerank_ids": pre_rerank_ids,
+                "post_rerank_ids": post_rerank_ids,
+            }
         }
 
 

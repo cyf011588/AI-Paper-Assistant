@@ -3,7 +3,7 @@ os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import sys
 sys.path.insert(0, 'src')
 from pathlib import Path
-from config import PROCESSED_DIR
+from config import PROCESSED_DIR, EVAL_DATASET_PATH
 from chunker import Chunk
 from smart_retriever import SmartRetriever
 
@@ -24,7 +24,7 @@ chunks = result['results']
 print(f"共返回 {len(chunks)} 个chunk：\n")
 
 # 加载标准答案chunk ids
-dataset = json.load(open(r'F:\RAG评估\ai-paper-pinggu\RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json','r',encoding='utf-8'))
+dataset = json.load(open(EVAL_DATASET_PATH, 'r', encoding='utf-8'))
 gt_ids = set()
 for item in dataset:
     if item['question_id'] == 'q012':

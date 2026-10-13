@@ -7,7 +7,7 @@ os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import sys
 sys.path.insert(0, 'src')
 from pathlib import Path
-from config import PROCESSED_DIR
+from config import PROCESSED_DIR, EVAL_DATASET_PATH
 from chunker import Chunk
 from smart_retriever import SmartRetriever
 from openai import OpenAI
@@ -26,7 +26,7 @@ retriever.build_index(all_chunks)
 llm = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 # 2. 加载评测数据集
-with open(r'F:\RAG评估\ai-paper-pinggu\RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json', 'r', encoding='utf-8') as f:
+with open(EVAL_DATASET_PATH, 'r', encoding='utf-8') as f:
     dataset = json.load(f)
 
 # 找跨论文对比题

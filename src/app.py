@@ -16,11 +16,12 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import gradio as gr
 
-from config import PAPERS_DIR, PROCESSED_DIR
+from config import PAPERS_DIR, PROCESSED_DIR, METADATA_PATH
 from pdf_parser import StructuredPDFParser
 from chunker import StructuralChunker, Chunk
 from smart_retriever import SmartRetriever
 from generator import AnswerGenerator
+import session_store
 
 
 # =========================
@@ -94,7 +95,7 @@ def upload_pdf(file_path):
         } for c in chunks], f, ensure_ascii=False, indent=2)
 
     # 2.5 自动更新paper_metadata.json（用LLM提取metadata）
-    metadata_path = Path("F:/AI_Project/AI-Paper-Assistant/data/paper_metadata.json")
+    metadata_path = METADATA_PATH
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             all_metadata = json.load(f)
@@ -204,7 +205,7 @@ def delete_paper(selected_row):
         structured_file.unlink()
 
     # 3. 从metadata删除
-    metadata_path = Path("F:/AI_Project/AI-Paper-Assistant/data/paper_metadata.json")
+    metadata_path = METADATA_PATH
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             all_metadata = json.load(f)
@@ -294,17 +295,17 @@ def resolve_context(question, history):
     return question
 
 
-def ask_question(question, history):
-    """提问：检索 → 生成回答"""
+def ask_question(question, history, conv_id):
+    """提问：检索 → 生成回答 → 持久化到SQLite"""
     if not question.strip():
-        return history, ""
+        return history, "", conv_id
 
     if not retriever.is_trained or len(retriever.all_chunks) == 0:
         history = history + [
             {"role": "user", "content": question},
             {"role": "assistant", "content": "知识库为空，请先上传论文"},
         ]
-        return history, ""
+        return history, "", conv_id
 
     # 对话消解：把"这篇论文"替换成具体论文名
     resolved_question = resolve_context(question, history)
@@ -322,11 +323,18 @@ def ask_question(question, history):
         print(f"  [{i+1}] {r['paper_name'][:30]} | {r['section_path'][:40]}")
 
     if not contexts:
+        no_hit_msg = "没有找到相关内容，请换个问法"
         history = history + [
             {"role": "user", "content": question},
-            {"role": "assistant", "content": "没有找到相关内容，请换个问法"},
+            {"role": "assistant", "content": no_hit_msg},
         ]
-        return history, ""
+        # 持久化
+        try:
+            session_store.save_message(conv_id, "user", question)
+            session_store.save_message(conv_id, "assistant", no_hit_msg)
+        except Exception as e:
+            print(f"[WARN] SQLite写入失败: {e}")
+        return history, "", conv_id
 
     # 生成回答
     result = generator.generate(question, contexts)
@@ -334,6 +342,7 @@ def ask_question(question, history):
     # 整理引用（按章节去重，显示所有命中章节）
     seen_sections = set()
     cite_lines = []
+    citations_for_db = []
     for cite in result["citations"]:
         paper = cite["paper"]
         section = cite['section'][:60] if cite['section'] else ""
@@ -343,6 +352,7 @@ def ask_question(question, history):
         seen_sections.add(key)
         citation_str = retriever.format_citation(paper)
         page = cite['page']
+        citations_for_db.append({"paper": paper, "section": section, "page": page})
         if section:
             cite_lines.append(f"{citation_str}\n   章节：{section} | 第 {page} 页")
         else:
@@ -355,12 +365,51 @@ def ask_question(question, history):
         {"role": "assistant", "content": answer_with_citations},
     ]
 
-    return history, ""
+    # 持久化到SQLite
+    try:
+        # 首条用户问题设为对话标题
+        if len(history) == 2:
+            session_store.update_conversation_title(conv_id, question)
+        session_store.save_message(conv_id, "user", question)
+        session_store.save_message(conv_id, "assistant", answer_with_citations, citations=citations_for_db)
+    except Exception as e:
+        print(f"[WARN] SQLite写入失败: {e}")
+
+    return history, "", conv_id
 
 
 # =========================
 # 构建 Gradio 界面
 # =========================
+
+def new_conversation():
+    """新建对话：创建新会话ID，清空聊天显示，重置current_papers"""
+    global current_papers
+    conv_id = session_store.create_conversation(title="新对话")
+    current_papers = []  # 会话隔离：清空之前的论文上下文
+    print(f"[新对话] conv_id={conv_id}")
+    return [], conv_id, ""
+
+
+def restore_on_start():
+    """应用启动时：恢复最近一次对话"""
+    global current_papers
+    session_store.init_db()
+    latest = session_store.get_latest_conversation()
+    if latest:
+        conv_id, title = latest
+        messages = session_store.get_messages(conv_id)
+        history = session_store.messages_to_chatbot_history(messages)
+        print(f"[恢复会话] {conv_id} | {title} | {len(messages)}条消息")
+        # 从历史消息推断current_papers（简化：清空，不自动恢复）
+        current_papers = []
+        return history, conv_id
+    else:
+        conv_id = session_store.create_conversation(title="新对话")
+        current_papers = []
+        print(f"[新会话] {conv_id}")
+        return [], conv_id
+
 
 with gr.Blocks(title="AI Paper Assistant") as demo:
     gr.Markdown("# 📚 AI Paper Assistant\n面向科研人员的个人论文知识库")
@@ -387,6 +436,9 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
                 # 右侧：聊天问答
                 with gr.Column(scale=2):
                     gr.Markdown("### 💬 提问")
+                    with gr.Row():
+                        new_chat_btn = gr.Button("🆕 新建对话", variant="secondary", size="sm")
+                        conv_title_display = gr.Markdown("")
                     chatbot = gr.Chatbot(height=500, label="对话记录")
                     question_input = gr.Textbox(
                         label="你的问题",
@@ -394,6 +446,7 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
                         lines=2,
                     )
                     ask_btn = gr.Button("提问", variant="primary")
+                    conv_state = gr.State(value=None)
 
         with gr.Tab("✍️ 论文写作"):
             gr.Markdown("### AI论文写作助手（多智能体：检索→看图写作→去重→审稿）")
@@ -402,6 +455,11 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
                 label="写作需求",
                 placeholder='例如：按照王鑫涛大论文4.2节的样式，分析我上传的滞回曲线',
                 lines=3,
+            )
+            user_viewpoint = gr.Textbox(
+                label="我的初步力学分析（选填，针对全新课题）",
+                placeholder='例如：我认为A点钢板首先屈服，因为红色集中在梁腹板...',
+                lines=2,
             )
 
             with gr.Row():
@@ -449,12 +507,15 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
 
     # 事件绑定
     upload_btn.click(upload_pdf, inputs=[file_input], outputs=[upload_status, kb_table])
-    ask_btn.click(ask_question, inputs=[question_input, chatbot], outputs=[chatbot, question_input])
-    question_input.submit(ask_question, inputs=[question_input, chatbot], outputs=[chatbot, question_input])
+    ask_btn.click(ask_question, inputs=[question_input, chatbot, conv_state], outputs=[chatbot, question_input, conv_state])
+    question_input.submit(ask_question, inputs=[question_input, chatbot, conv_state], outputs=[chatbot, question_input, conv_state])
     delete_btn.click(delete_paper, inputs=[kb_table], outputs=[kb_table])
 
+    # 新建对话
+    new_chat_btn.click(new_conversation, outputs=[chatbot, conv_state, conv_title_display])
+
     # 写作助手
-    def do_writing(request, batch_imgs, excel_file):
+    def do_writing(request, viewpoint, batch_imgs, excel_file):
         from writing_agent import WritingAgent
         from multimodal_parser import parse_file, save_to_my_results
 
@@ -470,11 +531,11 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
         img_path = batch_imgs[0] if batch_imgs else ""
 
         agent = WritingAgent(retriever=retriever)
-        result = agent.run(request, img_path)
+        result = agent.run(request, img_path, viewpoint)
         history_text = "\n".join(result.get("history", []))
         return result.get("final_text") or result.get("draft", ""), history_text
 
-    write_btn.click(do_writing, inputs=[write_request, batch_images, write_my_file], outputs=[write_output, write_history])
+    write_btn.click(do_writing, inputs=[write_request, user_viewpoint, batch_images, write_my_file], outputs=[write_output, write_history])
 
     # 批量提取图片特征
     def do_extract(files, specimen, load_step, fig_type):
@@ -545,8 +606,15 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
     fig_delete_btn.click(delete_figure, inputs=[fig_delete_id], outputs=[fig_status]).then(list_figures, outputs=[fig_list_text])
     fig_clear_btn.click(clear_figures, outputs=[fig_status]).then(list_figures, outputs=[fig_list_text])
 
-    # 启动时加载已有数据
-    demo.load(load_existing_papers, outputs=[kb_table, kb_table_mgmt])
+    # 启动时加载已有数据和最近对话
+    def on_start():
+        table_data1, table_data2 = load_existing_papers()
+        history, conv_id = restore_on_start()
+        conv_info = session_store.get_conversation(conv_id)
+        title_display = f"📂 当前对话：{conv_info['title']}" if conv_info else ""
+        return table_data1, table_data2, history, conv_id, title_display
+
+    demo.load(on_start, outputs=[kb_table, kb_table_mgmt, chatbot, conv_state, conv_title_display])
 
 
 if __name__ == "__main__":

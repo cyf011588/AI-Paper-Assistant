@@ -1,2 +1,38 @@
-packaging==26.2
+# ============================================================
+# AI Paper Assistant — 完整运行依赖（锁定版本）
+# 校验环境：Python 3.13 (Windows) / 2026-10
+# 安装：  pip install -r requirements.txt
+#
+# 说明：若你只做检索 / 评测 / 消融实验、不跑 Web UI 与写作工作流，
+#       可改用更小的 requirements-experiments.txt
+# ============================================================
+
+# --- PDF 解析 ---
 pymupdf==1.28.2
+
+# --- 向量检索（ChromaDB + 本地 Embedding/Reranker）---
+chromadb==1.5.9
+sentence-transformers==6.0.1
+torch==2.14.0
+numpy==2.3.5
+rank-bm25==0.2.2
+
+# --- 中文分词 / 数据处理 ---
+jieba==0.42.1
+pandas==2.3.3
+
+# --- 大模型调用 ---
+openai==3.15.0
+
+# --- 配置（从 .env 读取密钥）---
+python-dotenv==1.1.0
+
+# --- Web UI 与多智能体写作工作流 ---
+gradio==6.27.0
+langgraph==1.2.12
+
+# --- 图像处理（实验图片入库：TIF -> PNG 解码）---
+opencv-python-headless==5.0.0.93
+
+# --- 其他 ---
+packaging==25.0

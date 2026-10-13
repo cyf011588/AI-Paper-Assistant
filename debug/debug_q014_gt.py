@@ -1,5 +1,7 @@
 import json
-with open("F:/RAG评估/ai-paper-pinggu/RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json", "r", encoding="utf-8") as f:
+from pathlib import Path
+_DATASET = Path(__file__).resolve().parents[1] / "evaluation" / "dataset" / "RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json"
+with open(_DATASET, "r", encoding="utf-8") as f:
     data = json.load(f)
 
 for q in data:

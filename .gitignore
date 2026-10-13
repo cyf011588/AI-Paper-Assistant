@@ -10,10 +10,11 @@ venv/
 .vscode/
 .idea/
 
-# 环境变量
+# 环境变量（密钥统一放 .env，不再写在源码里）
 .env
 config_local.py
-src/config.py
+# 注：src/config.py 已不含任何密钥（全部从 .env 读取），因此纳入版本管理，
+#     他人 clone 后无需再手工复制；参数总览见 src/config.py.example
 
 # 数据（不上传大文件）
 data/papers/
@@ -22,6 +23,9 @@ data/chroma_db/
 data/chroma/
 data/cache/
 *.pdf
+
+# 本地运行时数据（各人自己的会话记录，不共享）
+data/session.db
 
 # 模型文件
 *.bin

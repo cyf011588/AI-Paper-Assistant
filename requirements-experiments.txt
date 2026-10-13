@@ -1,0 +1,30 @@
+# ============================================================
+# AI Paper Assistant — 实验 / 评测最小依赖
+#
+# 适用：只做「检索优化 / 消融实验 / 跑评测」，不需要启动 Web UI，
+#       也不需要看图写作（Qwen-VL 图片理解）与 TIF 图像处理。
+# 相比 requirements.txt 去掉了：gradio、langgraph、opencv-python-headless
+#
+# 安装：  pip install -r requirements-experiments.txt
+# ============================================================
+
+# --- PDF 解析与分块 ---
+pymupdf==1.28.2
+
+# --- 向量检索 ---
+chromadb==1.5.9
+sentence-transformers==6.0.1
+torch==2.14.0
+numpy==2.3.5
+rank-bm25==0.2.2
+
+# --- 中文分词 / 数据处理 ---
+jieba==0.42.1
+pandas==2.3.3
+
+# --- 大模型调用（评测打分 / 查询扩展）---
+openai==3.15.0
+
+# --- 配置 ---
+python-dotenv==1.1.0
+packaging==25.0

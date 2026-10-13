@@ -1,26 +1,36 @@
 """
-config.py — 全局配置（模板）
-使用前复制为 config.py 并填入你自己的 API key
+config.py.example — 配置参考（参数总览）
+
+注意：现在**推荐用 .env 管理密钥与可调参数**（见项目根目录 .env.example），
+      不再是「复制本文件为 config.py 再填 key」的旧用法。
+      config.py 会自动读取 .env；本文件仅作为「有哪些参数可配」的速查参考。
+
+如需在 .env 中覆盖某项，键名与下面完全一致（全大写）。
 """
 
 from pathlib import Path
 
 # =========================
-# 路径配置
+# 路径配置（一般无需修改）
 # =========================
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 PAPERS_DIR = DATA_DIR / "papers"
 PROCESSED_DIR = DATA_DIR / "processed"
 DB_DIR = DATA_DIR / "chroma_db"
+CACHE_DIR = DATA_DIR / "cache"
 METADATA_PATH = DATA_DIR / "paper_metadata.json"
 
 # =========================
-# DeepSeek API 配置
+# 大模型 API 配置（密钥请放 .env，不要写在这里）
 # =========================
-DEEPSEEK_API_KEY = "your-api-key-here"
+DEEPSEEK_API_KEY = ""                            # .env: DEEPSEEK_API_KEY
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
+SILICONFLOW_API_KEY = ""                         # .env: SILICONFLOW_API_KEY
+SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
+TEXT_MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+VL_MODEL_NAME = "Qwen/Qwen3-VL-30B-A3B-Instruct"
 
 # =========================
 # 解析参数
@@ -40,3 +50,6 @@ CHUNK_OVERLAP = 80
 # 检索参数
 # =========================
 TOP_K = 5
+RECALL_K = 100
+EMBEDDING_MODEL = "BAAI/bge-base-zh-v1.5"
+RERANKER_MODEL = "BAAI/bge-reranker-base"
