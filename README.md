@@ -182,6 +182,7 @@ python evaluate_v2.py
 
 | 文档 | 什么时候看 |
 |---|---|
+| [`docs/SETUP-新同事全流程.md`](docs/SETUP-新同事全流程.md) | **第一次装环境时看**：电脑要装什么、要不要 VSCode、没有 Python 怎么办、要不要虚拟环境、怎么配 API（零基础分步） |
 | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) | **新协作者从这里开始**：项目里有什么、归谁改、不能动什么、要配置什么 |
 | [`docs/INTERFACES.md`](docs/INTERFACES.md) | **改代码前**：五层划分 + 三张数据契约（chunk / 检索结果 / 引用），保证各自改各自的层不打架 |
 | [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | 分工、分支策略、评测规范、依赖分治、合并前检查清单 |

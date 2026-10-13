@@ -30,8 +30,14 @@ class QueryUnderstanding:
     """查询理解：识别论文/作者引用，提取内容问题"""
 
     def __init__(self):
-        with open(METADATA_FILE, "r", encoding="utf-8") as f:
-            self.metadata = json.load(f)
+        # paper_metadata.json 由 Web UI 首次上传论文时自动生成；
+        # 新机器用 build_index.py 重建索引时不会生成它。
+        # 缺失时降级为「无别名映射」，功能不受影响（只是不能按作者/论文名硬过滤）。
+        if METADATA_FILE.exists():
+            with open(METADATA_FILE, "r", encoding="utf-8") as f:
+                self.metadata = json.load(f)
+        else:
+            self.metadata = []
 
         # 构建别名→论文名列表的映射（一个别名可能对应多篇论文）
         self.alias_map = {}

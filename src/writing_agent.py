@@ -10,7 +10,8 @@ from typing import TypedDict, List
 from langgraph.graph import StateGraph, END
 from openai import OpenAI
 from config import (DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL,
-                    SILICONFLOW_API_KEY, SILICONFLOW_BASE_URL, VL_MODEL_NAME)
+                    SILICONFLOW_API_KEY, SILICONFLOW_BASE_URL, VL_MODEL_NAME,
+                    DATA_DIR)
 
 
 class WritingState(TypedDict):
@@ -147,12 +148,12 @@ class WritingAgent:
         mode = state.get("intent_mode", "整体趋势")
         user_viewpoint = state.get("user_viewpoint", "")
 
-        # 读mechanics_mapping
+        # 读mechanics_mapping（用 config.DATA_DIR，避免依赖当前工作目录）
         try:
             import json
-            with open("data/mechanics_mapping.json", "r", encoding="utf-8") as f:
+            with open(DATA_DIR / "mechanics_mapping.json", "r", encoding="utf-8") as f:
                 mapping = json.load(f)
-        except:
+        except Exception:
             mapping = {}
 
         if not features and not user_viewpoint:
