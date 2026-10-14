@@ -48,7 +48,7 @@
 ### E3 q026 检索失败归因
 - 日期：2026-10-xx（系列实验）
 - 方向：检索 / 查询扩展
-- 问题：q026「雷杰鑫大论文和王鑫涛大论文在研究方法上有什么共同点和不同点？」在 `comparison_decompose` 模式下 **strict=0.0、生成 3.0**，是 30 题里最差的样本。
+- 问题：q026「论文A和论文B在研究方法上有什么共同点和不同点？」在 `comparison_decompose` 模式下 **strict=0.0、生成 3.0**，是 30 题里最差的样本。
 - 假设：对比题被拆成子问题后，每篇论文**只保留 Top-5**，且子问题检索词过短，导致 gold chunk 未进入候选。
 - 改动/试过：`ablation_q026.py`、`ablation_q026_prompt.py`（证据导向 prompt）、`ablation_q026_rerank_q.py`（subquery vs expanded query 做 rerank）、`ablation_q026_terms.py`、`ablation_q026_terms2.py`（search_terms 数量扫描）、`ablation_q026_autogen.py`、`ablation_q026_evidence.py`。
 - 结果：**打印输出，未落盘 JSON**（见各脚本运行日志）。

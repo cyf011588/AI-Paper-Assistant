@@ -36,7 +36,7 @@
 ### 3.0 现在就可以做（本仓库已经是 git 仓库）
 
 ```bash
-cd F:/AI_Project/AI-Paper-Assistant
+cd /path/to/AI-Paper-Assistant
 
 # 1) 在 GitHub 建一个「私有」仓库（Private），然后关联并推送
 git remote add origin https://github.com/<你的账号>/ai-paper-assistant.git

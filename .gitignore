@@ -48,6 +48,10 @@ evaluation/eval_*.json
 # 本地运行时数据（各人自己的会话记录，不共享）
 data/session.db
 
+# 一次性实验脚本（引用本地论文名，不公开分发）
+ablation_*.py
+eval_30_*.py
+
 # 模型文件
 *.bin
 *.pt

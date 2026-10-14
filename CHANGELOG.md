@@ -65,7 +65,7 @@
 - 根目录 `debug_*.py`（4 个）、`test_5qs.py`、`test_shortcut_fix.py`：
   一次性排查与内嵌真题的自测脚本。
 - `docs/项目规划-AI_PM方向.md`：属于个人求职材料（简历模板 / PM 转型路线），
-  已移出到 `F:/AI_Project/作品集/`，不再随项目分发。
+  已移出到本地作品集目录，不再随项目分发。
 
 ### 保留（检索层实验资产完整保留）
 
@@ -172,10 +172,10 @@
 ### 修复（换机器必崩的硬编码路径）
 
 - `src/app.py`（2 处）、`src/query_understanding.py`（1 处）写死的
-  `F:/AI_Project/.../paper_metadata.json` → 改用 `config.METADATA_PATH`。
+  本地绝对路径 `paper_metadata.json` → 改用 `config.METADATA_PATH`。
 - 14 个评测 / 消融 / 调试脚本里写死的评测集绝对路径 → 改用 `config.EVAL_DATASET_PATH`
   或仓库内相对路径。
-- 5 个 `ablation_q026_*.py` 里写死的 `sys.path.insert("F:/AI_Project/.../src")`
+- 5 个 `ablation_q026_*.py` 里写死的 `sys.path.insert(本地绝对路径/src)`
   → 改为基于 `__file__` 推导。
 
 > 修复后全仓库 `.py` 中不再有任何 `F:\` 绝对路径（仅 `config.py` 保留一处
