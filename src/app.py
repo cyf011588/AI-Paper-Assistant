@@ -453,7 +453,7 @@ with gr.Blocks(title="AI Paper Assistant") as demo:
 
             write_request = gr.Textbox(
                 label="写作需求",
-                placeholder='例如：按照王鑫涛大论文4.2节的样式，分析我上传的滞回曲线',
+                placeholder='例如：按照张三硕士论文4.2节的样式，分析我上传的滞回曲线',
                 lines=3,
             )
             user_viewpoint = gr.Textbox(

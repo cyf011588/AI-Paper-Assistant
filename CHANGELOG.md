@@ -1,5 +1,22 @@
 # 版本记录
 
+## v0.9.4 (2026-10-14) — 泛化源码与文档中的真人姓名与本地绝对路径
+
+发布前复查发现，`src/` 与文档里残留了课题组**真实姓名**（`if __name__ == "__main__"`
+的测试示例、Prompt 里的示例作者、Gradio 输入框占位符、README 功能说明）。
+
+- `src/query_understanding.py`：docstring 与 `__main__` 测试问题 → 改为虚构占位名（张三 / 李四 / …）
+- `src/smart_retriever.py`：`__main__` 测试问题 → 同上
+- `src/writing_agent.py`：意图提取 Prompt 里的示例作者名 → 改为「张三」
+- `src/app.py`：写作 Tab 输入框占位符示例 → 改为「张三硕士论文」
+- `src/config.py`：`_resolve_eval_dataset()` 里写死的本机评测集绝对路径（含两位作者名）
+  → 改为读环境变量 `EVAL_DATASET_LEGACY`，仍保留老机器回退能力
+- `README.md`、`CHANGELOG.md`：同步去掉示例中的真实姓名
+
+行为不变：以上均为示例字符串与路径来源的调整，**检索 / 生成逻辑与默认参数一行未改**。
+
+---
+
 ## v0.9.3 (2026-10-14) — 远端仓库只发布框架：检索层实验资产不随仓库分发
 
 > 原则：GitHub 上的仓库只放**能跑起来的框架 + 写作模块**，不含任何论文衍生信息。
@@ -42,7 +59,7 @@
 ### 移除（41 个，已备份到仓库外 `_backup_AIPA_delete_20261014/`）
 
 - `debug/` 整个目录（30 个）：针对具体论文 / 具体题号的一次性诊断脚本
-  （如 `debug_wxt.py`、`fix_section_path.py`、`reindex_wang.py` 只对王鑫涛那篇有效，
+  （如 `debug_wxt.py`、`fix_section_path.py`、`reindex_wang.py` 只对某一篇论文有效，
   `debug_q013/q014/q021/q026.py`、`show_q0*.py` 只对特定题目有效）。
 - 根目录 `_*.py`（5 个）：下划线前缀＝用完即弃。
 - 根目录 `debug_*.py`（4 个）、`test_5qs.py`、`test_shortcut_fix.py`：

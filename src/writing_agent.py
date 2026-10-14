@@ -46,11 +46,11 @@ class WritingAgent:
         resp = self.ds_client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": f"""从用户写作需求中提取：
-1. author：作者名（如"王鑫涛"、"雷杰鑫"）
+1. author：作者名（如"张三"、"李四"）
 2. chapter：章节号（如"4.2"、"第五章"）
 3. task：写作任务类型
 
-只输出JSON，如：{{"author":"王鑫涛","chapter":"4.2","task":"写作模板"}}
+只输出JSON，如：{{"author":"张三","chapter":"4.2","task":"写作模板"}}
 
 需求：{state['user_request']}"""}],
             temperature=0.1,

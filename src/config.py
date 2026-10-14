@@ -32,15 +32,21 @@ def _resolve_eval_dataset() -> Path:
     放进 evaluation/dataset/ 即可，文件名随意；格式见 evaluation/dataset/README.md
     与其中的 example_dataset.json。
 
-    优先级：仓库内 evaluation/dataset/*.json（排除 example）  >  历史机器上的绝对路径。
+    优先级：仓库内 evaluation/dataset/*.json（排除 example）
+            > 环境变量 EVAL_DATASET_LEGACY 指向的路径
+            > 占位路径。
     """
     if DATASET_PATH.exists():
         found = sorted(p for p in DATASET_PATH.glob("*.json")
                        if p.name != "example_dataset.json")
         if found:
             return found[0]
-    legacy = Path(r"F:\RAG评估\ai-paper-pinggu\RAG分层评测数据集_雷杰鑫与王鑫涛大论文.json")
-    return legacy if legacy.exists() else (DATASET_PATH / "your_dataset.json")
+    legacy_env = os.environ.get("EVAL_DATASET_LEGACY", "")
+    if legacy_env:
+        legacy = Path(legacy_env)
+        if legacy.exists():
+            return legacy
+    return DATASET_PATH / "your_dataset.json"
 
 
 EVAL_DATASET_PATH = _resolve_eval_dataset()
