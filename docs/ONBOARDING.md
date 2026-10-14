@@ -5,6 +5,19 @@
 >
 > 先读 `README.md` 拿总览，再读本文拿细节，**动手改代码前必读 `docs/INTERFACES.md`**。
 
+> ### ⚠️ 本组当前分工（先看这个）
+>
+> **检索层已冻结，只开放写作层。**
+>
+> - **不用改**：怎么切分（`chunker.py`）、用哪个 embedding（`vector_store.py`）、怎么召回与精排
+>   （`smart_retriever.py` / `reranker.py` / `query_understanding.py`）、PDF 怎么解析。
+> - **你要改的**：`src/writing_agent.py` 里的 6 个节点与 Prompt（论文写作 Tab 的全部逻辑）、
+>   `src/vision_extractor.py`（看图描述）、导师风格库（`parse_word_revisions.py`）。
+> - **因此不需要跑评测**：`evaluate_v2.py` 那套 30 题评测是给「改检索」的人比分数用的；
+>   你改写作 Prompt，**改完直接看生成结果**即可（是不是引用了你图里的数据、有没有编造、像不像导师的改法）。
+>
+> 详见本文 **第 5 节**。
+
 ---
 
 ## 0. 三十秒了解这个项目
@@ -45,25 +58,19 @@
 | `bootstrap.py` | **只读环境自检**：Python / 依赖 / 密钥 / 数据 / 索引，并打印下一步命令 | **第一次进来先跑它** |
 | `build_index.py` | 从 `data/papers/*.pdf` 一键重建「解析 → 分块 → 向量库」 | 换机器后必跑；改了 `pdf_parser.py` / `chunker.py` 后必跑 |
 
-### 1.3 根目录脚本 —— 29 个 `.py`（这是「史料区」）
+### 1.3 根目录脚本 —— 18 个 `.py`
 
-| 类别 | 文件 | 说明 |
+| 类别 | 文件 | 你需要关心吗 |
 |---|---|---|
-| **评测（权威）** | `evaluate_v2.py` | **统一裁判，唯一权威入口**。任何优化都用它对比 |
-| 评测（专项） | `eval_30_focused.py`、`eval_30_cond_toc.py` | 30 题的 Conditional-TOC 对照实验 |
-| 消融实验 | `ablation_*.py`（13 个） | 检索/精排/查询扩展的对照实验，多数已完成 |
-| 调试 | `debug_*.py`（4 个） | 复现具体题目的检索过程 |
-| 临时 | `_*.py`（5 个） | 下划线前缀 = 用完即弃 |
-| 测试 | `test_vl.py`、`test_5qs.py`、`test_shortcut_fix.py` | 功能自测 |
-| 专项 | `parse_word_revisions.py` | 从 Word 修订记录提取导师修改偏好 → 风格库 |
+| **写作层工具** | `parse_word_revisions.py` | ✅ **要**：从 Word 修订记录提取导师修改偏好 → `style_db` |
+| 写作层自检 | `test_vl.py` | ✅ **要**：测 Qwen-VL 看图能力是否可用 |
+| 检索层评测 | `evaluate_v2.py`、`eval_30_focused.py`、`eval_30_cond_toc.py` | ❌ 不用：只在做检索优化时才跑 |
+| 检索层消融档案 | `ablation_*.py`（13 个） | ❌ 不用：已完成的检索对照实验，只读记录 |
 
-> **新方向不要往根目录加脚本**，请按 `docs/COLLABORATION.md` 的建议放到自己的分支或约定的子目录。
+> 一句话：**根目录里除 `parse_word_revisions.py` 与 `test_vl.py` 外，其余都可以不看。**
+> 这些检索实验的结论（含负结果）汇总在 `EXPERIMENTS.md`，需要时看那个就行。
 
-### 1.4 `debug/` —— 30 个脚本
-
-一次性诊断与可视化脚本（检查数据质量、复现某题、导出检索结果）。多数不会再跑，**不要在这里加新东西**。
-
-### 1.5 数据 —— `data/`（**全部不进 git**）
+### 1.4 数据 —— `data/`（**全部不进 git**）
 
 | 项 | 内容 | 是否进 git |
 |---|---|---|
@@ -76,7 +83,9 @@
 | `mechanics_mapping.json` | 力学现象 → 通俗解释映射（供图片描述用，不含论文内容） | 进 |
 | `session.db` | SQLite 会话库 | 不进 |
 
-### 1.6 评测 —— `evaluation/`
+### 1.5 评测 —— `evaluation/`
+
+> 只改写作层的话，**这一整节可以跳过**。它服务于「改检索 → 比分数」的场景。
 
 | 项 | 说明 | 是否进 git |
 |---|---|---|
@@ -89,7 +98,7 @@
 > 历史上的基线数字（strict 78.9% / 扩展后 89.2% / 生成 7.53）记录在
 > [`EXPERIMENTS.md`](../EXPERIMENTS.md) 里，那只是数字，不含论文内容。
 
-### 1.7 文档
+### 1.6 文档
 
 | 文件 | 什么时候看 |
 |---|---|
@@ -99,10 +108,9 @@
 | `docs/COLLABORATION.md` | 分工、分支策略、评测规范、合并检查清单 |
 | `docs/DISTRIBUTION.md` | 怎么把项目给到别人（为什么不给安装包） |
 | `EXPERIMENTS.md` | 实验登记表（含历史实验与负结果） |
-| `CHANGELOG.md` | 版本史（v0.1 → v0.7） |
-| `docs/项目规划-AI_PM方向.md` | 8 周 PM 路线图 + 竞品分析 |
+| `CHANGELOG.md` | 版本史（v0.1 → v0.9） |
 
-### 1.8 配置类文件
+### 1.7 配置类文件
 
 | 文件 | 是否进 git | 说明 |
 |---|---|---|
@@ -139,7 +147,7 @@ python scripts/build_index.py
 python src/app.py             # 浏览器打开 http://127.0.0.1:7860
 ```
 
-跑评测（改完任何东西都要做）：
+跑评测（**只有改检索层时才需要，改写作 Prompt 不用**）：
 
 ```bash
 python evaluate_v2.py
@@ -185,10 +193,10 @@ python evaluate_v2.py
 
 | 编号 | 不能动 | 为什么 |
 |---|---|---|
-| 1 | `evaluation/dataset/` 的评测集 | 它是**统一裁判**。改了，你的结果就无法和任何人对齐 |
+| 1 | `evaluation/dataset/` 的评测集 | 它是**统一裁判**。改了，你的结果就无法和任何人对齐（*仅改检索时适用*） |
 | 2 | 三张数据契约的**字段名与语义**（见 `docs/INTERFACES.md`） | 改了下游代码会**静默崩**（不报错但结果错） |
 | 3 | `config.py` 中现有的**导出名** | 删/改名会让全项目 import 失败。新增字段必须给默认值 |
-| 4 | `Chunk.id` 的**粒度** | 评测集的 `gold_chunk_ids` 直接指向它，改了历史评测全废 |
+| 4 | `Chunk.id` 的**粒度** | 评测集的 `gold_chunk_ids` 直接指向它，改了历史评测全废（*仅改检索时适用*） |
 | 5 | **`.env`** | 绝不能提交。它已在 `.gitignore` 里，别去删这行 |
 | 6 | `data/` 里的语料 | 受版权保护，不进 git，也不要对外分享原 PDF |
 
@@ -196,35 +204,67 @@ python evaluate_v2.py
 
 ---
 
-## 5. 归你改的（按优化方向认领）
+## 5. 归你改的（当前：只开放写作层）
 
-| 你的方向 | 只能改这些文件 | 用什么证明你变好了 |
+**约定：检索层已冻结，不开放。** 切分方式、embedding 模型、召回与精排都不用动 ——
+所以**你也不需要跑评测**，改完直接看生成结果。
+
+### 5.1 你的主场：论文写作（✍️ 论文写作 Tab）
+
+主文件 `src/writing_agent.py`，一条 LangGraph 工作流，6 个节点：
+
+| 节点 | 干什么 | 你想改的大概是 |
 |---|---|---|
-| 解析 / 双栏 / 公式 / 表格 | `pdf_parser.py`、`chunker.py`、`multimodal_parser.py` | 30 题 Retrieval |
-| 换 embedding / 多向量 / 索引结构 | `vector_store.py`、`config.py` 中模型名相关项 | 30 题 Retrieval |
-| 召回 / 精排 / 查询改写 | `smart_retriever.py`、`reranker.py`、`query_understanding.py` | 30 题 Retrieval |
-| Prompt / 写作 Agent / 多模态看图 | `generator.py`、`writing_agent.py`、`vision_extractor.py` | 生成评分 + 引用正确率 |
-| 前端 / 产品化 / 会话 | `app.py`、`session_store.py` | 人工体验 |
-| 换学科语料 | `data/` + **新建**评测集 | 新领域评测 |
+| `_retriever_node` | 提取「作者 + 章节」→ 硬过滤 ChromaDB 取模板段落；顺带取风格案例与图片特征 | 取几段模板、取几条风格案例 |
+| `_intent_router_node` | 判断写作场景：整体趋势 / 局部状态 / 参数对比 / 理论推演 | 加新的写作场景类型 |
+| `_mechanism_node` | 按场景选 Prompt，推理力学因果链（读 `data/mechanics_mapping.json`） | **各场景的推理 Prompt** |
+| `_writer_node` | **Qwen3-VL 看图写作**（最关键的一个节点） | **写作主 Prompt**：语气、结构、字数、禁用复制模板数据 |
+| `_dedup_node` | 8-gram 对比模板，有重复就调 DeepSeek 同义改写 | 重复判定阈值（当前 8-gram） |
+| `_reviewer_node` | DeepSeek 审稿：数据合理 / 表达严谨 / 有无抄袭，不合格退回重写 | 审查标准与通过条件 |
 
-> 只改自己那层，别人就不会被你打断。跨层改动允许，但要**声明为契约变更**。
+改法：**直接改节点函数里的 Prompt 文本即可**，不需要碰检索层。改完在 Web UI 的
+「论文写作」Tab 上传一张实验图 + 写一句需求，看输出效果。
+
+配套可改的还有：
+
+| 文件 | 作用 |
+|---|---|
+| `src/vision_extractor.py` | 图片特征描述 Prompt（曲线 / 云图 / 照片三类） |
+| `parse_word_revisions.py` | 从 Word 修订记录提取导师修改偏好 → `style_db`（风格库） |
+| `src/generator.py` | 问答生成的 Prompt（若你想顺带调问答口径） |
+
+**改完怎么判断变好**：人工看三条 —— ① 数据是否都来自你上传的图（有没有编造）；
+② 有没有照抄模板里的具体数值 / 试件号；③ 读起来像不像导师改出来的。
+
+### 5.2 明确不用你碰的（已冻结）
+
+| 模块 | 文件 |
+|---|---|
+| PDF 解析 / 分块 | `pdf_parser.py`、`chunker.py`、`multimodal_parser.py` |
+| Embedding / 向量库 / 索引 | `vector_store.py`、`config.py` 里模型名相关项 |
+| 召回 / 精排 / 查询理解 | `smart_retriever.py`、`reranker.py`、`query_understanding.py` |
+| 前端 / 会话 | `app.py`、`session_store.py` |
+
+> <details><summary>若将来要重开检索优化（现在不需要）</summary>
+>
+> 届时才需要跑评测，且**必须用同一套评测集**：`python evaluate_v2.py`，
+> 再用「基线 vs 改动」对照表说明效果。规范见 `docs/COLLABORATION.md`。
+> </details>
+
+**通用底线**：只改自己那层，别人就不会被你打断。跨层改动允许，但要**声明为契约变更**
+（见 `docs/INTERFACES.md`）。
 
 ---
 
-## 6. 协作流程（四条，照做即可）
+## 6. 协作流程（写作层版）
 
-1. **一条分支一个方向**：`git checkout -b feat/<你的方向>`。不要把两个无关优化塞进同一分支，否则评测归因不清。
-2. **跑同一套评测**：`python evaluate_v2.py`，结果落盘到 `evaluation/<方向>_<YYYYMMDD>.json`。
+1. **一条分支一个方向**：`git checkout -b feat/writing-<你的方向>`。不要把两个无关改动塞进同一分支。
+2. **改完自己看效果**：在 Web UI 的「论文写作」Tab，用**同一张实验图 + 同一条需求**跑改前 / 改后两版对比。
+   当前不做量化评测（检索层已冻结，写作质量本来也只能人工判断）。
 3. **登记一行**：在 `EXPERIMENTS.md` 追加「问题 → 假设 → 改动 → 结果 → 结论」。**负结果同样登记**，不要删。
-4. **PR 里贴对照表**（基线 vs 你的改动）：
+4. **PR 里说清楚**：改了哪个节点 / 哪段 Prompt、为什么这样改、贴上改前改后的生成示例。
 
-   | 指标 | 基线 | 本次改动 | Δ |
-   |---|---|---|---|
-   | Strict Recall@10 | 78.9% | ? | ? |
-   | 扩展后 Recall | 89.2% | ? | ? |
-   | 生成均分(/10) | 7.53 | ? | ? |
-
-主干只合并「评测通过」的改动。细节见 `docs/COLLABORATION.md`。
+细节见 `docs/COLLABORATION.md`。
 
 ---
 
@@ -235,14 +275,16 @@ python evaluate_v2.py
 | 跑起来知识库是空的 | `data/` 没进 git | 放 PDF 进 `data/papers/`，跑 `python scripts/build_index.py` |
 | 模型下载卡住 | 没设镜像 | 已在 `config.py` 默认 `HF_ENDPOINT=https://hf-mirror.com`；要换就写进 `.env` |
 | 配了 `.env` 却不生效 | 曾以为是系统变量优先 | 本项目已定为 `.env` 优先；确认你在项目根目录下运行 |
-| 结果和别人的对不上 | 不是同一份评测集 / 没重跑评测 | 确认 `config.EVAL_DATASET_PATH` 指向仓库内 `evaluation/dataset/`，且改了分块后重跑过 |
-| 不知道从哪改起 | — | 看"当前短板"：跨论文对比 58.3%、按章节问 65.3%，是最值得攻的方向 |
+| 生成结果抄了模板里的数字 | `_writer_node` 的约束不够狠 | 加强「硬性要求」那段的措辞，见本文 5.1 |
+| 改完觉得变好但说不清 | 没有固定对照 | 用**同一张图 + 同一条需求**跑改前 / 改后两版，按 5.1 的三条标准逐条对 |
+| 不知道从哪改起 | — | 先读本文 5.1 的节点表，从 `_writer_node` 的写作主 Prompt 下手 |
 
 ---
 
 ## 8. 现在这个项目的真实状态（不粉饰）
 
-- **已完成**：RAG 问答闭环、写作工作流、知识库管理、30 题评测体系、可复现化改造、协作层（契约/规范/分发）。
-- **已知短板**：跨论文对比题（58.3%）与按章节问（65.3%）召回偏弱；`q026` 单题检索失败（strict=0.0）。
-- **已知负结果**：Conditional-TOC 方案反而变差（对比题 −25pp），保留为反例证据。
+- **已完成**：RAG 问答闭环、写作工作流、知识库管理、可复现化改造、协作层（契约/规范/分发）。
+- **检索层已知短板（已冻结，你不用管）**：跨论文对比题（58.3%）与按章节问（65.3%）召回偏弱；
+  `q026` 单题检索失败（strict=0.0）。
+- **已知负结果**：Conditional-TOC 方案反而变差（对比题 −25pp），保留在 `EXPERIMENTS.md` 作为反例证据。
 - **尚未做**：目录解耦（把 `src/` 分成 `core/` 与 `experiments/`）——因会打断 import 路径，暂缓。

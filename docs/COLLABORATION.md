@@ -1,50 +1,55 @@
 # 协作机制（COLLABORATION）
 
-> 目标：多人、多机、各自方向并行优化，互不覆盖、且**结果可比较**。
-> 三条铁律：**① 统一裁判 ② 只动自己那层 ③ 数据不进 git。**
+> 目标：多人并行改**论文写作模块**，互不覆盖。
+> 三条铁律：**① 只动写作层 ② 检索层已冻结 ③ 数据不进 git。**
+>
+> ⚠️ **本组当前只开放写作层**：切分 / embedding / 召回 / 精排都不用改，因此也**不跑评测**。
+> 下面第三节的评测规范只在「将来重开检索优化」时才适用，现在可以跳过。
 
 ---
 
 ## 一、谁只碰哪些文件（分工边界）
 
-先看 `docs/INTERFACES.md` 的五层划分。下面把「优化方向」映射到「允许改的文件」：
+先看 `docs/INTERFACES.md` 的五层划分。当前只开放 **L4 生成层里的写作模块**：
 
-| 优化方向 | 只允许改 | 评测依据 |
+| 方向 | 只允许改 | 判定标准 |
 |---|---|---|
-| 解析 / 双栏 / 公式 / 表格 | `pdf_parser.py`、`chunker.py`、`multimodal_parser.py` | 30 题 Retrieval |
-| 换 embedding / 多向量 / 索引结构 | `vector_store.py`、`config.py` 里模型名相关项 | 30 题 Retrieval |
-| 召回 / 精排 / 查询改写 | `smart_retriever.py`、`reranker.py`、`query_understanding.py` | 30 题 Retrieval |
-| Prompt / 写作 Agent / 多模态看图 | `generator.py`、`writing_agent.py`、`vision_extractor.py` | 生成评分 + 引用正确率 |
-| 前端 / 产品化 / 会话 | `app.py`、`session_store.py` | 人工体验 |
-| 换学科语料 | `data/` + **新建**评测集 | 新领域评测 |
+| 写作主链 | `writing_agent.py` 的 6 个节点与 Prompt | 人工看生成效果（见 ONBOARDING 5.1） |
+| 看图描述 | `vision_extractor.py` | 描述是否准确 |
+| 导师风格库 | `parse_word_revisions.py` + `style_db` 集合 | 改写是否更像导师 |
+| 问答 Prompt（可选） | `generator.py` | 引用是否对得上 |
 
-> 跨层改动（例如同时改 `chunker.py` 和 `smart_retriever.py`）是允许的，但**必须在 PR 描述里说明是「契约变更」**，并走 `INTERFACES.md` ⑤ 的流程。
+**已冻结（不要改）**：`pdf_parser.py`、`chunker.py`、`multimodal_parser.py`、`vector_store.py`、
+`smart_retriever.py`、`reranker.py`、`query_understanding.py`、`app.py`、`session_store.py`。
+
+> 跨层改动（例如同时改 `writing_agent.py` 和 `smart_retriever.py`）是允许的，但**必须在 PR 描述里说明是「契约变更」**，并走 `INTERFACES.md` ⑤ 的流程。
 
 ---
 
 ## 二、分支策略
 
 ```bash
-# 主干永远保持「评测通过」的状态
+# 主干永远保持「能跑起来」的状态
 main / master
 
-# 每个方向一条分支，命名 feat/<方向>
-git checkout -b feat/parser-two-column
-git checkout -b feat/retriever-rrf-weight
-git checkout -b feat/embedding-bge-m3
+# 每个方向一条分支，命名 feat/writing-<方向>
+git checkout -b feat/writing-plate-cloudmap-prompt
+git checkout -b feat/writing-dedup-threshold
+git checkout -b feat/writing-mechanism-prompts
 ```
 
 规则：
-1. **一个方向一条分支**，不要把两个无关优化塞进同一分支（否则评测归因不清）。
-2. 主干只合并**评测通过**的改动；未通过的改动留在分支上——**负结果同样有价值**，但如实标注。
-3. 合并前先 `git rebase origin/main`（或 merge），确保评测是在**最新主干**上跑的。
-4. **负结果不要删分支**：现有 `Conditional-TOC`（-4.1pp）就是可复用的负结果证据。
+1. **一个方向一条分支**，不要把两个无关改动塞进同一分支（否则说不清是哪个改动起了作用）。
+2. 主干只合并**实测有效**的改动；未通过的改动留在分支上——**负结果同样有价值**，但如实标注。
+3. **负结果不要删分支**：`EXPERIMENTS.md` 里 E2 的 Conditional-TOC（−4.1pp）就是可复用的负结果证据。
 
 ---
 
-## 三、统一裁判（最重要）
+## 三、统一裁判（⚠️ 仅「重开检索优化」时适用）
 
-**一套评测集就是全项目唯一的对比口径。** 任何优化，必须跑同一套题，否则「结果不认」。
+**一套评测集就是全项目唯一的对比口径。** 任何**检索层**优化，必须跑同一套题，否则「结果不认」。
+
+> 改写作 Prompt 不需要这一节——写作质量没有可比口径，只能人工判断。
 
 > ⚠️ 本仓库**不发布评测集**：它的问题、标准答案、`gold chunk id` 都来自具体论文。
 > 格式见 [`evaluation/dataset/README.md`](../evaluation/dataset/README.md)。
@@ -136,10 +141,11 @@ python scripts/build_index.py
 
 ## 六、提交 / 合并前检查清单
 
-- [ ] 只改了自己方向的文件（或已声明为契约变更）
-- [ ] `python -m py_compile` 通过
-- [ ] 跑通 `python evaluate_v2.py`，结果落盘 + 登记 `EXPERIMENTS.md`
-- [ ] PR 描述含「基线 vs 改动」对照表
+- [ ] 只改了写作层文件（或已声明为契约变更）
+- [ ] `python -m py_compile src/writing_agent.py` 通过
+- [ ] 在 Web UI「论文写作」Tab 用**同一张图 + 同一条需求**跑通改前 / 改后两版
+- [ ] 结果登记到 `EXPERIMENTS.md`（含负结果）
+- [ ] PR 描述含「改了哪个节点 / 哪段 Prompt + 改前改后生成示例」
 - [ ] 没有提交 `.env`、`data/`、`*.pdf`
 - [ ] 契约若有变更，已更新 `docs/INTERFACES.md`
 

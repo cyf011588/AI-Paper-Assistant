@@ -2,6 +2,10 @@
 
 面向科研人员的个人论文知识库 + 论文写作助手。
 
+> **给课题组同事的一句话**：检索层（解析 / 切分 / embedding / 召回 / 精排）**已冻结、不用改**，
+> 你只需要改 **论文写作模块**（`src/writing_agent.py`）——因此**不需要跑评测**，改完直接看效果。
+> 详见 [`docs/ONBOARDING.md`](docs/ONBOARDING.md) 第 5 节。
+
 ## 项目能力
 
 ### 1. 文献问答（💬 问答 Tab）
@@ -66,10 +70,11 @@ AI-Paper-Assistant/
 │   ├── build_index.py      # 一键重建索引（新机器只需放 PDF 即可复现）
 │   └── bootstrap.py        # 环境自检（新机器第一步：缺什么、下一步敲什么）
 ├── docs/
+│   ├── ONBOARDING.md       # 协作者指南：改哪里、怎么跑（新同事从这里开始）
+│   ├── SETUP-新同事全流程.md # 零基础装机分步（要装什么、怎么配 API）
 │   ├── INTERFACES.md       # 层间数据契约（改代码前必读）
-│   ├── COLLABORATION.md    # 分支 / 评测 / 分工协作规范
-│   ├── DISTRIBUTION.md     # 怎么把项目给到别人（Git vs 安装包）
-│   └── 项目规划-AI_PM方向.md
+│   ├── COLLABORATION.md    # 分支 / 分工协作规范
+│   └── DISTRIBUTION.md     # 怎么把项目给到别人（Git vs 安装包）
 ├── evaluation/
 │   └── dataset/            # 评测集目录：只放格式模板，评测集由各人本地自备
 ├── data/                   # 语料与索引：全部不入库，放论文后本地重建
@@ -77,13 +82,19 @@ AI-Paper-Assistant/
 │   ├── processed/          #   解析产物（可重建）
 │   └── chroma_db/          #   向量库（可重建）
 ├── EXPERIMENTS.md          # 实验登记表（问题→假设→改动→结果→结论）
-├── evaluate_v2.py          # 分层评估脚本
+├── evaluate_v2.py          # 检索层分层评估脚本
+├── eval_30_focused.py      # 30 题专项对照实验
+├── eval_30_cond_toc.py     # 30 题 Conditional-TOC 对照实验
+├── ablation_*.py           # 检索消融实验档案（13 个，已完成的只读记录）
 ├── parse_word_revisions.py # 提取Word修订记录→导师风格库
 ├── test_vl.py              # 测试Qwen-VL
 ├── .env.example            # 环境变量模板（复制为 .env 填自己的 Key）
 ├── requirements.txt        # 完整运行依赖（已锁定版本）
 └── requirements-experiments.txt  # 只做检索/评测的最小依赖
 ```
+
+> 根目录里**只有 `parse_word_revisions.py` 和 `test_vl.py` 与写作任务相关**；
+> 其余 `evaluate_v2.py` / `eval_30_*.py` / `ablation_*.py` 是检索层的实验档案，可以完全不看。
 
 ## ChromaDB 集合
 

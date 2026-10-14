@@ -1,5 +1,66 @@
 # 版本记录
 
+## v0.9.2 (2026-10-14) — 仓库瘦身：移除一次性脚本，明确「只开放写作层」
+
+> 背景：本组分工调整为**检索层冻结、只改论文写作模块**。既然切分 / embedding /
+> 召回 / 精排都不动，评测体系对写作任务就用不上，那些「针对具体题目、具体论文」的
+> 一次性排查脚本更是纯噪音。本次做减法。
+
+### 移除（41 个，已备份到仓库外 `_backup_AIPA_delete_20261014/`）
+
+- `debug/` 整个目录（30 个）：针对具体论文 / 具体题号的一次性诊断脚本
+  （如 `debug_wxt.py`、`fix_section_path.py`、`reindex_wang.py` 只对王鑫涛那篇有效，
+  `debug_q013/q014/q021/q026.py`、`show_q0*.py` 只对特定题目有效）。
+- 根目录 `_*.py`（5 个）：下划线前缀＝用完即弃。
+- 根目录 `debug_*.py`（4 个）、`test_5qs.py`、`test_shortcut_fix.py`：
+  一次性排查与内嵌真题的自测脚本。
+- `docs/项目规划-AI_PM方向.md`：属于个人求职材料（简历模板 / PM 转型路线），
+  已移出到 `F:/AI_Project/作品集/`，不再随项目分发。
+
+### 保留（检索层实验资产完整保留）
+
+- `evaluate_v2.py`、`eval_30_focused.py`、`eval_30_cond_toc.py`、`evaluation/`：
+  评测能力与评测集格式模板（`EXPERIMENTS.md` 里 E1–E5 数字的复现依据）。
+- `ablation_*.py`（13 个）：`EXPERIMENTS.md` 的 E2–E5 直接引用它们，且 E4/E5 结论
+  「未落盘 JSON」，脚本是唯一证据，故保留为只读档案。
+- `EXPERIMENTS.md`、`requirements-experiments.txt`、`test_vl.py`、`parse_word_revisions.py`。
+
+### 文档同步
+
+- `README.md` / `docs/ONBOARDING.md` / `docs/COLLABORATION.md` 统一为
+  **「检索层已冻结 → 只改 `writing_agent.py` 等写作层 → 不需要跑评测」** 的口径：
+  - ONBOARDING 第 5 节重写：给出写作工作流 6 个节点的职责表 + 「改完怎么判断变好」。
+  - ONBOARDING 第 1.3 节：标注根目录里只有 `parse_word_revisions.py` / `test_vl.py`
+    与写作任务相关。
+  - COLLABORATION 第一节：分工表收窄到写作层，明确列出「已冻结」的 9 个文件；
+    第三节评测规范标注为「仅重开检索优化时适用」。
+
+### 未改动
+
+- `src/` 下所有业务逻辑、Prompt、默认参数**一行未改**。
+- 仓库文件数：97 → 56。
+
+---
+
+## v0.9.1 (2026-10-13) — 修复「新 clone 直接崩溃」
+
+- `src/query_understanding.py`：`__init__` 无条件读取 `paper_metadata.json`，
+  新 clone 没有该文件时首次检索即崩。改为**缺失时降级为空 metadata**，
+  只失去「按作者 / 论文名硬过滤」能力，其余检索正常。
+- `src/writing_agent.py`：改用 `config.DATA_DIR` 绝对路径读
+  `data/mechanics_mapping.json`，不再依赖当前工作目录。
+
+## v0.9 (2026-10-13) — 补齐新同事上手会踩的三个坑
+
+- **空目录不进 git**：`data/papers/`、`data/processed/`、`data/chroma_db/`、
+  `data/cache/` 在新 clone 里不存在 → `.gitignore` 改用 `data/*/*` + `!data/*/.gitkeep`，
+  并新增 4 个 `.gitkeep` 占位。
+- **`.env` 静默失效**：未安装 `python-dotenv` 时 `.env` 会被忽略且无任何提示 →
+  `config.py` 检测到 `.env` 存在但导入失败时打印明确告警。
+- `src/app.py` 端口支持 `APP_PORT` 环境变量覆盖（默认 `7860` 不变）。
+
+---
+
 ## v0.8 (2026-10-13) — 公开仓库只发布「可运行的框架」：论文与论文衍生数据全部移出
 
 > 目标：把这个仓库公开出去时，**只给别人能跑起来的东西**，不发布任何论文。
