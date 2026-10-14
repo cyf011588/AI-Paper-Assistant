@@ -9,9 +9,9 @@
 
 | 接收方 | 诉求 | 正确方式 |
 |---|---|---|
-| **A. 要改代码的队友 / 协作者** | 换机器能跑、能改、能跑评测对比 | ✅ **Git 仓库**（本文主线） |
+| **A. 要改代码的队友 / 协作者** | 换机器能跑、能改写作层 | ✅ **Git 仓库**（本文主线） |
 | **B. 只用不改的人（导师演示、评审、答辩）** | 双击就能看 | ✅ 在线部署链接 / Docker 镜像 / 打包 exe |
-| **C. 只想要一份数据或结果** | 看数字、看报告 | ✅ 直接给 `evaluation/*.json` 与作品集 PDF |
+| **C. 只想要一份结果** | 看数字、看报告 | ✅ 作品集 PDF |
 
 **关键判断**：只要对方要「各自方向优化」，就**绝不能给安装包**——见下节。
 
@@ -56,7 +56,7 @@ git clone https://github.com/<你的账号>/ai-paper-assistant.git
 cd ai-paper-assistant
 
 python scripts/bootstrap.py            # ① 自检：告诉你缺什么、下一步敲什么
-pip install -r requirements.txt        # ② 装依赖（只做检索/评测可用 requirements-experiments.txt）
+pip install -r requirements.txt        # ② 装依赖（约 3–4 GB，主要在这等）
 cp .env.example .env                   # ③ 填自己的 API Key（.env 不入库）
 # 把论文 PDF 放进 data/papers/，然后
 python scripts/build_index.py          # ④ 一键重建 解析→分块→向量库
@@ -73,8 +73,7 @@ python src/app.py                      # 跑起来 → http://127.0.0.1:7860
 |---|---|---|
 | 源码 `src/`、脚本、文档 | ✅ 进 | 协作的核心 |
 | `requirements*.txt`、`.env.example` | ✅ 进 | 环境可复现 |
-| 评测集 `evaluation/dataset/*.json` | ⛔ 不进 | 含论文原文与衍生答案。repo 只放格式模板 `example_dataset.json`；**同一份评测集走群内共享（附 MD5）** |
-| `evaluation/*.json`（评测产物） | ⛔ 不进 | 含论文衍生答案，本地跑出来即可 |
+| 检索层实验资产（`ablation_*.py`、`evaluate_v2.py`、`EXPERIMENTS.md`、`evaluation/`） | ⛔ 不进 | 含论文作者名与题号；只在原作者本地保留，远端仓库只放框架 |
 | `data/paper_metadata.json` | ⛔ 不进 | 论文题录，用 Web UI 上传论文时自动生成 |
 | `.env`（真实密钥） | ⛔ 不进 | 已 `.gitignore`；泄露即烧钱 |
 | `data/papers/*.pdf` | ⛔ 不进 | 版权 + 体积；走网盘/对象存储给「清单+MD5」 |

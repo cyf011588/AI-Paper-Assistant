@@ -127,11 +127,6 @@ python -m pip install -r requirements.txt
 ```
 
 - 这一步会下载约 **3–4 GB**（主要是 `torch`），**慢是正常的**，去泡杯茶。
-- 如果只做**检索 / 评测 / 消融实验**、不跑网页界面和写作工作流，
-  可以装更小的版本，省掉一大半体积：
-  ```powershell
-  python -m pip install -r requirements-experiments.txt
-  ```
 - 下载慢可以加国内镜像：
   ```powershell
   python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
@@ -170,15 +165,16 @@ python src/app.py
 
 （`127.0.0.1` 只在本机可访问，别人打不开你的页面，安全。）
 
-### 第 6 步：跑评测（改完任何东西都要做）
+### 第 6 步：开始调写作层
 
-```powershell
-python evaluate_v2.py
-```
+到这里环境就通了。本组当前**只改论文写作模块**，不需要跑评测：
 
-> ⚠️ 公开仓库**不含评测集**（它里面有论文原文）。你需要把自己的评测集
-> JSON 放进 `evaluation/dataset/`，格式见该目录的 `README.md` 和
-> `example_dataset.json`。没放的话脚本会提示你怎么做，不会直接崩。
+1. 浏览器打开 **http://127.0.0.1:7860**
+2. 切到「✍️ 论文写作」Tab，上传一张实验图 + 写一句需求，点生成
+3. 想改 Prompt 就编辑 `src/writing_agent.py` 里各节点的 Prompt 文本，保存后
+   重启 `python src/app.py` 再看效果
+
+改哪里、怎么判断改好了，见 [`ONBOARDING.md`](ONBOARDING.md) 第 5 节。
 
 ---
 
@@ -311,7 +307,7 @@ python scripts/bootstrap.py
 | 改了 `.env` 但密钥不生效 | 依赖没装 / 不在项目根目录运行 | 先装依赖（`python-dotenv` 在其中）；确认当前目录是项目根目录 |
 | 知识库是空的 / 提问答不上来 | 没放语料或没建索引 | 放 PDF 进 `data/papers/`，跑 `python scripts/build_index.py` |
 | 首次运行卡在"下载模型" | 在从 HuggingFace 拉 embedding 模型 | 已默认走国内镜像；耐心等第一次，之后有缓存 |
-| `evaluate_v2.py` 报找不到评测集 | 公开仓库不含评测集 | 把自己的评测集放进 `evaluation/dataset/`，见该目录 README |
+| 生成的文字抄了模板里的数字 | 写作 Prompt 约束不够严 | 加强 `writing_agent.py` 里 `_writer_node` 的「硬性要求」 |
 | `git clone` 连不上 | 网络 / 代理限制 | 让对方打包 zip 发你，或走公司代理 |
 | 端口 7860 被占用 | 已有实例在跑 | 换端口：`$env:APP_PORT=7861; python src/app.py` |
 | 没有显卡能跑吗 | — | 能。纯 CPU 检索会慢些，功能完整 |
@@ -320,18 +316,17 @@ python scripts/bootstrap.py
 
 ## 8. 配好之后，我该改哪里？
 
-环境只是入场券。**改动范围**见 `docs/INTERFACES.md`（五层划分 + 数据契约）
-与 `docs/COLLABORATION.md`（分工与评测纪律）。一句话版：
+**当前约定：检索层已冻结，只改论文写作模块。** 一句话版：
 
-| 我想优化… | 只改这些文件 |
+| 我想改… | 改这些 |
 |---|---|
-| PDF 解析 / 分块 | `src/pdf_parser.py`、`src/chunker.py` |
-| 换 embedding 模型 | `src/vector_store.py` + `.env` 里的 `EMBEDDING_MODEL` |
-| 召回 / 精排 / 查询改写 | `src/smart_retriever.py`、`src/reranker.py`、`src/query_understanding.py` |
-| 生成回答 / 写作 Agent / 看图 | `src/generator.py`、`src/writing_agent.py`、`src/vision_extractor.py` |
-| 网页界面 | `src/app.py` |
+| 写作主链（怎么组织段落、怎么用图里的数据） | `src/writing_agent.py` 里各节点的 Prompt |
+| 图片描述（曲线 / 云图 / 照片怎么描述） | `src/vision_extractor.py` |
+| 导师风格库（从 Word 修订记录学改法） | `parse_word_revisions.py` |
+| 问答口径（可选） | `src/generator.py` 的 Prompt |
+| 切分 / embedding / 召回 / 精排 | 🚫 已冻结，不用动 |
 
-**任何优化都必须跑 `python evaluate_v2.py`（同一套评测），否则结果不认。**
+改完**直接看生成效果**，不需要跑评测。细节见 [`ONBOARDING.md`](ONBOARDING.md) 第 5 节。
 
 ---
 
@@ -350,11 +345,10 @@ copy .env.example .env          # 然后编辑 .env 填两个 Key
 python scripts/bootstrap.py     # 自检，缺什么照它说的做
 python scripts/build_index.py   # 放了新 PDF 之后重建索引
 python src/app.py               # 启动网页界面
-python evaluate_v2.py           # 改完代码跑评测
 
 # 提交自己的改动
-git checkout -b feat/我的方向
+git checkout -b feat/writing-我的方向
 git add -A
-git commit -m "feat: 我做了什么"
+git commit -m "feat: 我改了什么 Prompt"
 git push
 ```

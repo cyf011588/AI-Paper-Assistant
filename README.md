@@ -75,26 +75,19 @@ AI-Paper-Assistant/
 │   ├── INTERFACES.md       # 层间数据契约（改代码前必读）
 │   ├── COLLABORATION.md    # 分支 / 分工协作规范
 │   └── DISTRIBUTION.md     # 怎么把项目给到别人（Git vs 安装包）
-├── evaluation/
-│   └── dataset/            # 评测集目录：只放格式模板，评测集由各人本地自备
 ├── data/                   # 语料与索引：全部不入库，放论文后本地重建
 │   ├── papers/             #   PDF 原文（各人自备）
 │   ├── processed/          #   解析产物（可重建）
 │   └── chroma_db/          #   向量库（可重建）
-├── EXPERIMENTS.md          # 实验登记表（问题→假设→改动→结果→结论）
-├── evaluate_v2.py          # 检索层分层评估脚本
-├── eval_30_focused.py      # 30 题专项对照实验
-├── eval_30_cond_toc.py     # 30 题 Conditional-TOC 对照实验
-├── ablation_*.py           # 检索消融实验档案（13 个，已完成的只读记录）
 ├── parse_word_revisions.py # 提取Word修订记录→导师风格库
 ├── test_vl.py              # 测试Qwen-VL
 ├── .env.example            # 环境变量模板（复制为 .env 填自己的 Key）
-├── requirements.txt        # 完整运行依赖（已锁定版本）
-└── requirements-experiments.txt  # 只做检索/评测的最小依赖
+└── requirements.txt        # 完整运行依赖（已锁定版本）
 ```
 
-> 根目录里**只有 `parse_word_revisions.py` 和 `test_vl.py` 与写作任务相关**；
-> 其余 `evaluate_v2.py` / `eval_30_*.py` / `ablation_*.py` 是检索层的实验档案，可以完全不看。
+> 本仓库只发布**能跑起来的框架 + 写作模块**。原作者的检索层实验资产
+> （`ablation_*.py`、`evaluate_v2.py`、`EXPERIMENTS.md`、`evaluation/` 等）
+> 含论文作者名与题号，**不随本仓库分发**。
 
 ## ChromaDB 集合
 
@@ -118,8 +111,6 @@ python scripts/bootstrap.py     # 只读检查：Python / 依赖 / 密钥 / 数�
 ```bash
 # 建议 Python 3.13
 pip install -r requirements.txt
-# 只做检索 / 评测 / 消融实验、不跑 Web UI 的话，用更小的：
-# pip install -r requirements-experiments.txt
 ```
 
 ### 2. 配置密钥（不再改源码）
@@ -161,33 +152,18 @@ python src/app.py
 # 浏览器打开 http://127.0.0.1:7860
 ```
 
-## 评估
-
-```bash
-python evaluate_v2.py
-# 基线：Strict Recall@10 = 78.9%，扩展后 89.2%，生成评分 7.53/10
-```
-
-> ⚠️ **本仓库不发布评测集**。评测集里的问题、标准答案、`gold chunk id` 都直接来自具体
-> 论文，属于论文内容的衍生品，因此和语料一样只留在本地。
->
-> 格式见 [`evaluation/dataset/README.md`](evaluation/dataset/README.md) 与同目录的
-> `example_dataset.json`；把自己的评测集 JSON 放进 `evaluation/dataset/` 即可，
-> `config.EVAL_DATASET_PATH` 会自动选中（自动跳过 example 模板）。
-
-一组人想比分数，前提是**跑同一套评测集 + 同一个脚本**——它是全项目唯一的「统一裁判」。
-换语料就必须换评测集，换完之后旧分数不可直接比较。
-
 ## 多机器 / 多人协作要点
 
 - **密钥不入库**：每个人在自己机器上维护各自的 `.env`。
 - **论文与论文衍生数据一律不入库**：`data/papers`、`data/processed`、`data/chroma_db`、
-  `data/cache`、`data/paper_metadata.json`、评测集与评测结果都在 `.gitignore` 中。  
-  论文由各人自备，索引由 `scripts/build_index.py` 从 PDF 重建，评测集按
-  `evaluation/dataset/README.md` 自建 —— 公开仓库里只有「能跑起来的框架」。
-- **只改 .env 切换策略**：`CHUNK_SIZE`、`TOP_K`、`RECALL_K`、`EMBEDDING_MODEL`、`RERANKER_MODEL`  
-  等都可写进 `.env` 覆盖，无需改动源码 —— 不同优化方向可各自一套配置。
-- **统一评测口径**：任何优化都用同一套 30 题评测（`evaluate_v2.py`）对比，结果落盘到 `evaluation/`。
+  `data/cache`、`data/paper_metadata.json` 都在 `.gitignore` 中。  
+  论文由各人自备，索引由 `scripts/build_index.py` 从 PDF 重建 ——
+  仓库里只有「能跑起来的框架」。
+- **本组分工：检索层已冻结，只改写作层** —— 切分 / embedding / 召回 / 精排都不用动，
+  因此**不需要跑评测**，改完 Prompt 直接看效果。见
+  [`docs/ONBOARDING.md`](docs/ONBOARDING.md) 第 5 节。
+- **只改 .env 也能切模型**：`DEEPSEEK_MODEL`、`VL_MODEL_NAME`、`TEXT_MODEL_NAME` 等
+  都可写进 `.env` 覆盖，无需改动源码。
 
 ## 文档地图（协作必读）
 
@@ -195,7 +171,6 @@ python evaluate_v2.py
 |---|---|
 | [`docs/SETUP-新同事全流程.md`](docs/SETUP-新同事全流程.md) | **第一次装环境时看**：电脑要装什么、要不要 VSCode、没有 Python 怎么办、要不要虚拟环境、怎么配 API（零基础分步） |
 | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) | **新协作者从这里开始**：项目里有什么、归谁改、不能动什么、要配置什么 |
-| [`docs/INTERFACES.md`](docs/INTERFACES.md) | **改代码前**：五层划分 + 三张数据契约（chunk / 检索结果 / 引用），保证各自改各自的层不打架 |
-| [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | 分工、分支策略、评测规范、依赖分治、合并前检查清单 |
-| [`EXPERIMENTS.md`](EXPERIMENTS.md) | 实验登记表（含 Conditional-TOC 负结果、q026 归因等历史实验） |
+| [`docs/INTERFACES.md`](docs/INTERFACES.md) | **改代码前**：五层划分 + 三张数据契约（chunk / 检索结果 / 引用） |
+| [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | 分工、分支策略、合并前检查清单 |
 | [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md) | 怎么把项目给到别人：为什么**不该给安装包**、Git 该怎么传 |

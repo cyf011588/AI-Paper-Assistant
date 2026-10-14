@@ -15,7 +15,7 @@
 | **L3 检索** | 问题 → 候选片段 | `smart_retriever.py`、`reranker.py`、`query_understanding.py` | 见契约 ② |
 | **L4 生成** | 片段 → 带引用回答 | `generator.py`、`writing_agent.py` | 见契约 ③ |
 | **L5 交互与持久化** | 界面、会话 | `app.py`、`session_store.py` | `data/session.db` |
-| 横切 | 配置 / 脚本 / 评测 | `config.py`、`scripts/`、`evaluation/` | — |
+| 横切 | 配置 / 脚本 | `config.py`、`scripts/` | — |
 
 数据流：`L1 → L2 → L3 → L4 → L5`，逐层通过下面三张契约传递。
 
@@ -25,7 +25,7 @@
 
 **定义位置**：`src/chunker.py` 的 `@dataclass Chunk`
 **持久化形式**：`data/processed/{paper}_chunks.json`，是一个 `Chunk` 列表的 JSON 数组
-**消费方式**：`Chunk(**c)` 直接反序列化（`evaluate_v2.py` / `scripts/build_index.py` 均如此）
+**消费方式**：`Chunk(**c)` 直接反序列化（`scripts/build_index.py` 等均如此）
 
 | 字段 | 类型 | 必有 | 语义 |
 |---|---|---|---|
@@ -156,9 +156,9 @@ generate(question: str, contexts: List[dict]) -> dict
 任何**破坏性**变更（删/改名、改语义、改 id 粒度）：
 
 1. 在本文件 `## 变更记录` 追加一条；
-2. 在 `EXPERIMENTS.md` 登记为一次实验（含动机与影响面）；
+2. 在 PR 描述里说明动机与影响面；
 3. 同步更新所有下游消费者；
-4. **重跑 30 题评测**并在 PR 里贴出对比。
+4. 检索层已冻结，写作层改动**一般不会触及**这三张契约；若确实动了检索相关字段，需重新验证检索链路。
 
 ## 变更记录
 
